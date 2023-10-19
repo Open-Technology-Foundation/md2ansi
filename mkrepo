@@ -43,12 +43,16 @@
 # git push origin main
 # 
 # git push --set-upstream origin main
- 	set -e
+	set -e
+	declare -- _ent_0=$(readlink -fn -- "$0") || _ent_0=''
+	declare -- PRG=${_ent_0##*/}
+	declare -- PRGDIR=${_ent_0%/*}
+
 	declare -- repository_dir=Open-Technology-Foundation/md2ansi
 	declare -- source_dir=/ai/scripts/lib/md2ansi
  	cd "$source_dir"
-	declare -- version=$(head -n1 .version >/dev/null || echo '0.4.20')	
-	declare -- gh=/usr/bin/gh 
+	declare -- version=$(./md2ansi -V || echo '0.4.20')
+	declare -- gh=/usr/bin/gh
 	declare -- git=$(command -v git)
 	declare -i new=0
 
@@ -58,9 +62,10 @@
 		new=1
 	 	$git init -b main
 	fi
-	
+
  	$git add .
  	$git commit -m "${1:-update $version}"
+	
 	if ((new)); then
 	 	$gh repo create "$repository_dir" --public
  	fi

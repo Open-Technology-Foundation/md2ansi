@@ -1,6 +1,9 @@
 #!/bin/bash
 #shellcheck disable=SC2034
 set -e
+declare -- _ent_0=$(readlink -fn -- "$0") || _ent_0=''
+declare -- PRG=${_ent_0##*/}
+declare -- PRGDIR=${_ent_0%/*}
 declare -- version='0.4.20'
 
 md2ansi() {
@@ -120,20 +123,21 @@ Desc    : Print formatted ANSI output to terminal from Markdown file.md.
 Synopsis: $PRG [file.md [...]] [< md_input_stream]
 Examples: $PRG < README.md
         : $PRG < *.md
-        : $PRG file1.md file2.md file3.md
+        : $PRG file1.md
+        : $PRG file1.md file2.md file3.md <file4.md
 EOT
   }
   local -a args=()
   while(($#)); do case "$1" in
     -V|--version) echo "$PRG $version"; return 0 ;;
     -h|--help)    usage; return 0 ;;
-    -?|--*)       >&2 echo "Invalid option '$1'"; exit 22 ;;
+    -?|--*)       >&2 echo "$PRG: Invalid option '$1'"; exit 22 ;;
     *)            args+=( "$1" ) ;;
   esac; shift; done
   if ((${#args[@]})); then
     local -- mdfile md=''
     for mdfile in "${args[@]}"; do
-      [[ -f "$mdfile" ]] || { >&2 echo "File '$mdfile' not found"; exit 1 ; }
+      [[ -f "$mdfile" ]] || { >&2 echo "$PRG: File '$mdfile' not found"; exit 1 ; }
       md+=$(cat -s -- "$mdfile"; echo)
     done
     md2ansi <<<"$md"
