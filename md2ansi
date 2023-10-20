@@ -121,7 +121,9 @@ md2ansi() {
   done
 }
 
-main() {
+# In script.sh
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+_main() {
   usage() {
   cat <<EOT
 Script  : $PRG vs $version
@@ -151,5 +153,6 @@ EOT
   [[ ! -t 0 ]] && md2ansi
 }
 
-main "$@"
+_main "$@"
+fi
 #fin
