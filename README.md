@@ -18,7 +18,7 @@
     script.dv2 file, via stdin. --
 
 | hdr1 | hdr2 | hdr3 |
-|---|---|---|---|
+| --- | --- | --- |
 | AA | BBB | CCCC |
 | aaaa | bbb | cc |
 | 1 | 2 | 3 |
