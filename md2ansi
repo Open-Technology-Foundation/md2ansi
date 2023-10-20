@@ -42,7 +42,7 @@ md2ansi() {
       local -a _cols=() table_row=()
       local -ai _max_widths=()
       local -i _cols_n=0 _i
-      local -- _col _row
+      local -- _col _row _lineoff=''
       while [[ $line == "|"* ]]; do
         # Remove starting and ending '|', and split the line into columns
         IFS='|' read -ra _cols <<< "${line:1}"
@@ -64,13 +64,18 @@ md2ansi() {
         _row='|'
         for((_i=0; _i<_cols_n; _i++)); do
           printf -v _col " %-${_max_widths[$_i]}s |" "${_cols[$_i]}"
+          [[ ${_col:0:4} == ' ---' ]] && _col="${_col// /-}"
           _row+="$_col"
         done
+        [[ ${_row:0:4} == '|---' && -z "$_lineoff" ]] \
+          && { _row="${_row//|/+}"; _lineoff="$_row" ; }
         table_row+=( "$_row" )
         IFS= read -r line
       done
-      printf '%s\n' "${table_row[@]}" ""
-      unset _cols table_row _max_widths _cols_n _i _col _row
+      [[ -n $_lineoff ]] && printf '%s\n' "$_lineoff"
+      printf '%s\n' "${table_row[@]}"
+      [[ -n $_lineoff ]] && printf '%s\n' "$_lineoff" ""
+      unset _cols table_row _max_widths _cols_n _i _col _row _lineoff
       continue
     fi
 
