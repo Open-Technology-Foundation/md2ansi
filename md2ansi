@@ -37,41 +37,42 @@ md2ansi() {
       continue
     fi
 
-    while [[ $line == "|"* ]]; do
-      # Remove starting and ending '|', and split the line into columns
-      IFS="|" read -ra columns <<< "$line"
-      columns=("${columns[@]:1:${#columns[@]}-1}")
-      # Remove leading and trailing spaces from each column
-      for i in "${!columns[@]}"; do
-        columns[$i]="$(echo -e "${columns[$i]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    # Tables
+    if [[ $line == "|"* ]]; then
+      local -a _cols=() table_row=()
+      local -ai _max_widths=()
+      local -i _cols_n=0 _i
+      local -- _col _row
+      while [[ $line == "|"* ]]; do
+        # Remove starting and ending '|', and split the line into columns
+        IFS='|' read -ra _cols <<< "${line:1}"
+        ((${#_cols[@]})) \
+          && [[ "${_cols[@]:1:${#_cols[@]}-1}" == '|' ]] \
+          && _cols=("${_cols[@]:1:${#_cols[@]}-1}")
+        ((_cols_n)) || _cols_n=${#_cols[@]}
+        # Remove leading and trailing spaces from each column
+        for _i in "${!_cols[@]}"; do
+          _cols[$_i]="$(echo -e "${_cols[$_i]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        done
+        # Determine the max width for each column
+        for _i in "${!_cols[@]}"; do
+          [[ ! -v _max_widths[$_i] ]] && _max_widths[$_i]=0
+          ((${#_cols[$_i]} > ${_max_widths[$_i]})) \
+            && _max_widths[$_i]=${#_cols[$_i]}
+        done
+        # Add the columns to table row
+        _row='|'
+        for((_i=0; _i<_cols_n; _i++)); do
+          printf -v _col " %-${_max_widths[$_i]}s |" "${_cols[$_i]}"
+          _row+="$_col"
+        done
+        table_row+=( "$_row" )
+        IFS= read -r line
       done
-      # Determine the max width for each column
-      if [ ${#max_widths[@]} -eq 0 ]; then
-        for col in "${columns[@]}"; do
-          max_widths+=("${#col}")
-        done
-      else
-        for i in "${!columns[@]}"; do
-          max_widths[$i]=$((${#columns[$i]} > ${max_widths[$i]} ? ${#columns[$i]} : ${max_widths[$i]}))
-        done
-      fi
-      # Add the columns to table data
-      table_data+=("${columns[*]}")
-
-      IFS= read -r line
-      if [[ "${line:0:1}" != "|" ]]; then
-        # Print the formatted table
-        for row in "${table_data[@]}"; do
-          IFS="|" read -ra cols <<< "$row"
-          echo -n "| "
-          for i in "${!cols[@]}"; do
-            printf "%-${max_widths[$i]}s | " "${cols[$i]}"
-          done
-          echo
-        done
-        break
-      fi
-    done
+      printf '%s\n' "${table_row[@]}" ""
+      unset _cols table_row _max_widths _cols_n _i _col _row
+      continue
+    fi
 
     # Horizontal Rules
     if [[ ${line:0:3} == '---' ||  ${line:0:3} == '==='  ||  ${line:0:3} == '___' ]]; then
@@ -81,7 +82,7 @@ md2ansi() {
 
     # Blockquotes
     if [[ "$line" =~ ^\> ]]; then
-      echo "$line" | sed -E "s/^> (.*)/${BLOCKQUOTE}> \1${RESET}/"
+      echo "$line" | sed -E "s/^> (.*)/  ${BLOCKQUOTE}> \1${RESET}/"
       continue
     fi
 
