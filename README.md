@@ -3,7 +3,7 @@
 ### DESCRIPTION
 
  | markdown | ansi | notes |
- | --- | --- | --- |
+ | -: | -: | - |
  | BLOCKQUOTE | x1b[35m | ^> |
  | BOLD | x1b[31;1m |  |
  | CODE_BLOCK | x1b[90m | ^\`\`\` |

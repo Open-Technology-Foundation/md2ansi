@@ -71,7 +71,6 @@ md2ansi() {
         _nextrow+=1
         IFS= read -r line || break
       done
-
       unset _col _row
       local -i _col _row=0
       local -- _hdr='|' _lineoff='|'
