@@ -1,18 +1,18 @@
 # NAME
+
 **md2ansi - simple terminal markdown translator**
 
 # SYNOPSIS
+
 **`md2ansi [file.md [...]] [< md_input_stream]`**
 
-`agent`
+`file.md`
 
-    Agent file (with '.dv2.agent' filename extension).
-    Optional, Positional; must be first argument,
-    before any other options.
+Markdown formatted file. Optional.
 
 `md_input_stream`
 
-    Markdown formatted input_stream via stdin.
+Markdown formatted input stream via stdin. Required if `file.md` not specified.
 
 # EXAMPLES:
 
@@ -29,17 +29,17 @@ md2ansi file1.md file2.md file3.md \< file4.md
 
 # REQUIRES
 
-    Bash 5.1
+Bash 5.1
 
 # REPORTING BUGS
 
-    Report bugs and deficiencies on the [Open Technology github page](https://github.com/Open-Technology-Foundation/md2ansi)
+Report bugs and deficiencies on the [Open Technology github page](https://github.com/Open-Technology-Foundation/md2ansi)
 
 # COPYRIGHT
 
-    Copyright © 2022-2023 [Indonesian Open Technology Foundation](https://yatti.id).  License GPLv3+: GNU GPL version 3 or later [GNU Licences](https://gnu.org/licenses/gpl.html).  This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
+Copyright © 2022-2023 [Indonesian Open Technology Foundation](https://yatti.id).  License GPLv3+: GNU GPL version 3 or later [GNU Licences](https://gnu.org/licenses/gpl.html).  This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
 
 # SEE ALSO
 
-    [YaTTI github](https://github.com/Open-Technology-Foundation/)
+[YaTTI github](https://github.com/Open-Technology-Foundation/)
 
