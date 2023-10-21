@@ -25,7 +25,7 @@ md2ansi file1.md file2.md file3.md \< file4.md
     Bash 5.1
 
 # REPORTING BUGS
-    Report bugs and deficiencies on the [DV2 github page](https://github.com/Open-Technology-Foundation/md2ansi)
+    Report bugs and deficiencies on the [Open Technology github page](https://github.com/Open-Technology-Foundation/md2ansi)
 
 # COPYRIGHT
     Copyright © 2022-2023 [Indonesian Open Technology Foundation](https://yatti.id).  License GPLv3+: GNU GPL version 3 or later [GNU Licences](https://gnu.org/licenses/gpl.html).  This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
