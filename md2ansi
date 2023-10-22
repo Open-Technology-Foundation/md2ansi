@@ -26,7 +26,7 @@ md2ansi() {
     H5='\x1b[34;1m' \
     H6='\x1b[34m' \
     RESET='\x1b[0m'
-  local -- line
+  local -- line=''
   while IFS= read -r line; do
     # Check for code block markers
     if [[ "${line:0:3}" == "\`\`\`" ]]; then
@@ -40,22 +40,25 @@ md2ansi() {
     fi
 
     # Tables
-    if [[ $line == "|"* ]]; then
+    if [[ $line =~ ^[[:space:]]*\| ]]; then
       local -a  _cols=()
       local -ai _max_widths=()
       local -i  _cols_n=0 _i _nextrow=0
       local --  _col _row
       local -A  _table_rows=()
-      while [[ $line == "|"* ]]; do
-        # Remove starting and ending '|', and split the line into columns
+      while [[ $line =~ ^[[:space:]]*\| ]]; do
+        line="$(trim -e "$line")"
+        # Remove starting and ending '|'
+        line="${line:1}"
+        ((${#line})) \
+          && [[ "${line: -1}" == '|' ]] \
+          && _line="${line:0:${#_line}-1}"
+        # Split the line into columns
         IFS='|' read -ra _cols <<< "${line:1}"
-        ((${#_cols[@]})) \
-          && [[ "${_cols[@]:1:${#_cols[@]}-1}" == '|' ]] \
-          && _cols=("${_cols[@]:1:${#_cols[@]}-1}")
         ((_cols_n)) || _cols_n=${#_cols[@]}
         # Remove leading and trailing spaces from each column
         for _i in "${!_cols[@]}"; do
-          _cols[$_i]="$(echo -e "${_cols[$_i]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          _cols[$_i]="$(trim -e "${_cols[$_i]}")"
         done
         # Determine the max width for each column
         for _i in "${!_cols[@]}"; do
@@ -73,9 +76,22 @@ md2ansi() {
       done
       unset _col _row
       local -i _col _row=0
-      local -- _hdr='|' _lineoff='|'
+      local -- _hdr='|'
       for((_col=0; _col<_cols_n; _col++)); do
         _hdr+="$(printf     " %-${_max_widths[$_col]}s |" "${_table_rows[$_row,$_col]}")"
+      done
+      local -- _lineoff='|'
+      local -a _fmt=()
+      _row=1
+      for((_col=0; _col<_cols_n; _col++)); do
+        _line="${_table_rows[$_row,$_col]}"
+        if [[ "$_line" == ':'* ]]; then
+          _fmt[$_col]='-'
+        elif [[ "$_line" == *':' ]]; then
+          _fmt[$_col]=''
+        else
+          _fmt[$_col]='c'
+        fi
         _lineoff+="$(printf " %-${_max_widths[$_col]}s-|" '-' |tr ' ' '-')"
       done
       _lineoff=${_lineoff//\|/\+}
@@ -86,7 +102,13 @@ md2ansi() {
       for((_row=2; _row<_nextrow; _row++)); do
         echo -n '|'
         for((_col=0; _col<_cols_n; _col++)); do
-          printf " %-${_max_widths[$_col]}s |" "${_table_rows[$_row,$_col]}"
+          if [[ ${_fmt[$_col]} == '-' ]]; then
+            printf " %-${_max_widths[$_col]}s |" "${_table_rows[$_row,$_col]}"
+          elif [[ ${_fmt[$_col]} == '' ]]; then
+            printf " %${_max_widths[$_col]}s |" "${_table_rows[$_row,$_col]}"
+          else
+            printf ' %s |' "$(center_text ${_max_widths[$_col]} "${_table_rows[$_row,$_col]}")"
+          fi
         done
         echo
       done
@@ -137,6 +159,45 @@ md2ansi() {
     echo -e "$line"  | fmt -w ${COLUMNS:-78}
   done
 }
+
+center_text() {
+  local -i w=$1; shift
+  local -- text
+  text=$(trim "$*")
+  ((${#text} >= w)) && { echo "${text:0:$w}"; return 0; }
+  local -i lpad
+  lpad=$(((w - ${#text}) / 2))
+  local -i rpad
+  rpad=$(((w - ${#text}) - lpad))
+  text=$(printf '%s%s%s' "$(printf "%0.s " $(seq 1 $lpad))" \
+                  "$text" \
+                  "$(printf "%0.s " $(seq 1 $rpad))")
+  echo -n "${text:0:$w}"
+}
+declare -fx center_text
+
+trim() {
+  if (($#)); then
+    local -- v
+    if [[ $1 == '-e' ]]; then
+      shift
+      v="$(echo -en "$*")"
+    else
+      v="$*"
+    fi
+    v="${v#"${v%%[![:blank:]]*}"}"
+    echo -n "${v%"${v##*[![:blank:]]}"}"
+    return 0
+  fi
+  if [[ ! -t 0 ]]; then
+    local -- REPLY
+    while read -r; do
+      REPLY="${REPLY#"${REPLY%%[![:blank:]]*}"}"
+      echo "${REPLY%"${REPLY##*[![:blank:]]}"}"
+    done
+  fi
+}
+declare -fx trim
 
 # In script.sh
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
