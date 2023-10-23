@@ -2,24 +2,52 @@
 
 ### DESCRIPTION
 
- | markdown | ansi | notes |
- | -: | :- | - |
- | BLOCKQUOTE | x1b[35m | ^> |
- | BOLD | x1b[31;1m |  |
- | CODE_BLOCK | x1b[90m | ^``` |
- | H1 | x1b[31;1m | |
- | H2 | x1b[32;1m | |
- | H3 | x1b[33;1m | ^### |
- | H4 | x1b[33m | ^#### |
- | H5 | x1b[34;1m | ^##### |
- | H6 | x1b[34m | ^###### |
- | HORIZONTAL_RULE | x1b[36m | --- |
- | INLINE_CODE | x1b[97m | `` |
- | ITALICS | x1b[34m |  |
- | LIST | x1b[36m | ^* |
- | RESET | x1b[0m |  |
- | STRIKETHROUGH | x1b[2m |  |
- | TABLE_BLOCK | x1b[90m |  |
+Print formatted ANSI output to terminal from Markdown file.md.
+
+`md2ansi` converts Markdown streams into a terminal representation using ANSI escape sequences for formatting. It defines various ANSI color codes for different Markdown elements such as code blocks, tables, headers, blockquotes, italics, bold, strikethrough, inline code, and lists.
+
+* ANSI Colour Palette: This section defines variables for different ANSI color codes used for formatting Markdown elements.
+
+* Code Blocks: Detects code block markers (lines starting with "\u0060\u0060\u0060") and applies the appropriate formatting to display the code block content.
+
+* Tables: Detects lines starting with "|" to identify table rows. It processes the table rows, determines the maximum width for each column, and formats the table accordingly.
+
+* Horizontal Rules: Detects lines consisting of "---", "===", or "\_\_\_" to create horizontal rules in the output.
+
+* Blockquotes: Lines starting with ">" are treated as blockquotes and indented accordingly.
+
+* Italics and Bold: Markdown for italics and bold with the corresponding ANSI color codes.
+
+* Strikethrough: Markdown for strikethrough with the corresponding ANSI color code.
+
+* Inline Code: Markdown for inline code with the corresponding ANSI color code.
+
+* Lists: The script indents lines starting with "\u002A" or "-" to represent unordered lists.
+
+* Headers: Markdown for headers with the corresponding ANSI color codes.
+
+* General Text Formatting: The `fmt` command is optionally used to wrap and format general text content.
+
+The following markdown is processed:
+
+ | function        | ansi      | markdown |
+ | -:              | :-        | -        |
+ | BLOCKQUOTE      | x1b[35m   | ^>       |
+ | BOLD            | x1b[31;1m | *        |
+ | CODE_BLOCK      | x1b[90m   | ^```     |
+ | H1              | x1b[31;1m | ^#       |
+ | H2              | x1b[32;1m | ^##      |
+ | H3              | x1b[33;1m | ^###     |
+ | H4              | x1b[33m   | ^####    |
+ | H5              | x1b[34;1m | ^#####   |
+ | H6              | x1b[34m   | ^######  |
+ | HORIZONTAL_RULE | x1b[36m   | ---      |
+ | INLINE_CODE     | x1b[97m   | ``       |
+ | ITALICS         | x1b[34m   | _        |
+ | LIST            | x1b[36m   | ^*       |
+ | RESET           | x1b[0m    |          |
+ | STRIKETHROUGH   | x1b[2m    |          |
+ | TABLE_BLOCK     | x1b[90m   | \|*       |
 
 
 ### SYNOPSIS
