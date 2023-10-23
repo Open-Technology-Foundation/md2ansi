@@ -7,8 +7,9 @@ declare -- PRGDIR=${_ent_0%/*}
 declare -- version='0.4.20'
 
 md2ansi() {
+  # Borrow IFS
+  local -I IFS
   # ANSI Colour Palette
-  local -I  IFS
   local -- \
     CODE_BLOCK='\x1b[90m' \
     TABLE_BLOCK='\x1b[90m' \
@@ -28,7 +29,7 @@ md2ansi() {
     RESET='\x1b[0m'
   local -- line=''
   while IFS= read -r line; do
-    # Check for code block start marker ^```.
+    # Code Block ^```
     if [[ "${line:0:3}" == '```' ]]; then
       echo -e "${CODE_BLOCK}\`\`\`${line:3}"
       while IFS= read -r line; do
@@ -39,7 +40,7 @@ md2ansi() {
       continue
     fi
 
-    # Tables
+    # Tables ^[space]|space
     if [[ $line =~ ^[[:space:]]*\| ]]; then
       local -a  _cols=()
       local -ai _max_widths=()
@@ -118,37 +119,41 @@ md2ansi() {
       continue
     fi
 
-    # Horizontal Rules
+    # Horizontal_Rules ^--- ^=== ^___
     if [[ ${line:0:3} == '---' ||  ${line:0:3} == '==='  ||  ${line:0:3} == '___' ]]; then
       echo -e "\r$(head -c "$((${COLUMNS:-78} - 1))" < /dev/zero | tr '\0' "${line:0:1}")"
       continue
     fi
 
-    # Blockquotes
+    # Blockquotes ^\>
     if [[ "$line" =~ ^\> ]]; then
       echo "$line" | sed -E "s/^> (.*)/  ${BLOCKQUOTE}> \1${RESET}/"
       continue
     fi
 
-    # Italics and Bold
+    # Bold **
     line=$(echo "$line" | sed -E "s/\*\*(.*?)\*\*/${BOLD}\1${RESET}/g")
+
+    # Italics *
     line=$(echo "$line" | sed -E "s/\*(.*?)\*/${ITALICS}\1${RESET}/g")
 
-    # Strikethrough
+    # Strikethrough ~~
     line=$(echo "$line" | sed -E "s/\~\~(.*?)\~\~/${STRIKETHROUGH}\1${RESET}/g")
 
-    # Inline Code
+    # Inline_Code `(.*?)`
     line=$(echo "$line" | sed -E "s/\`(.*?)\`/${INLINE_CODE}\1${RESET}/g")
 
-    # Lists
+    # List ^[space]*\*space[.*]
     line=$(echo "$line" | sed -E "s/^[ ]*\* (.*)/    ${LIST}* \1${RESET}/")
+    # List ^[space]*\-space[.*]
     line=$(echo "$line" | sed -E "s/^[ ]*\- (.*)/    ${LIST}- \1${RESET}/")
+    # If it *is* a list line, print it out, get to next line.
     if [[ "$line" =~ ^[[:space:]]*[*-] ]]; then
       echo -e "$line"
       continue
     fi
 
-    # Headers
+    # Headers ^#..#space(.*)
     line=$(echo "$line" | sed -E "s/^###### (.*)/${H6}\1${RESET}/")
     line=$(echo "$line" | sed -E "s/^##### (.*)/${H5}\1${RESET}/")
     line=$(echo "$line" | sed -E "s/^#### (.*)/${H4}\1${RESET}/")

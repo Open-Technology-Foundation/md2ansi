@@ -2,11 +2,11 @@
 
 ### DESCRIPTION
 
-Print formatted ANSI output to terminal from Markdown file.md.
+Print formatted ANSI output to terminal from Markdown file.md or Markdown input stream.
+
+`md2ansi` is 100% core `Bash`.
 
 `md2ansi` converts Markdown streams into a terminal representation using ANSI escape sequences for formatting. It defines various ANSI color codes for different Markdown elements such as code blocks, tables, headers, blockquotes, italics, bold, strikethrough, inline code, and lists.
-
-* ANSI Colour Palette: This section defines variables for different ANSI color codes used for formatting Markdown elements.
 
 * Code Blocks: Detects code block markers (lines starting with "\u0060\u0060\u0060") and applies the appropriate formatting to display the code block content.
 
@@ -49,6 +49,21 @@ The following markdown is processed:
  | STRIKETHROUGH   | x1b[2m    |          |
  | TABLE_BLOCK     | x1b[90m   | \|*       |
 
+For each line of input to `md2ansi`, the following transformations are carried out, in this order:
+
+  | transform | match |
+  | :- | - |
+  | Code Block | ^```
+  | Tables  | ^[space]|space
+  | Horizontal_Rules  | ^--- ^=== ^___
+  | Blockquotes  | ^\>
+  | Bold | **
+  | Italics | *
+  | Strikethrough  | ~~
+  | Inline_Code  | `(.*?)`
+  | List* | ^[space]*\*space[.*]
+  | List- | ^[space]*\-space[.*]
+  | Headers | ^#..#space(.*)
 
 ### SYNOPSIS
 
@@ -67,11 +82,11 @@ Markdown formatted input stream via stdin. Required if `file.md` not specified.
 ```bash
 md2ansi < README.md
 
-md2ansi < \*.md
+md2ansi < *.md
 
 md2ansi file1.md
 
-md2ansi file1.md file2.md file3.md \< file4.md
+md2ansi file1.md file2.md file3.md < file4.md
 
 ```
 
