@@ -29,14 +29,15 @@ md2ansi() {
     RESET='\x1b[0m'
   local -- line=''
   while IFS= read -r line; do
-    # Code Block ^```
-    if [[ "${line:0:3}" == '```' ]]; then
-      echo -e "${CODE_BLOCK}\`\`\`${line:3}"
+    # Code Block ^``` ^~~~
+    if [[ "${line:0:3}" == '```' || "${line:0:3}" == '~~~' ]]; then
+      echo -e "${CODE_BLOCK}~~~${line:3}"
       while IFS= read -r line; do
-        [[ "${line:0:3}" == '```' ]] && break
+        [[ "${line:0:3}" == '```' || "${line:0:3}" == '~~~' ]] \
+          && break
         echo -e "    ${CODE_BLOCK}${line}"
       done
-      echo -e "${CODE_BLOCK}\`\`\`${RESET}"
+      echo -e "${CODE_BLOCK}~~~${RESET}"
       continue
     fi
 

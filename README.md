@@ -33,7 +33,7 @@ The following markdown is processed:
  | function        | ansi      | markdown |
  | -:              | :-        | -        |
  | BLOCKQUOTE      | x1b[35m   | ^>       |
- | BOLD            | x1b[31;1m | *        |
+ | BOLD            | x1b[31;1m | **       |
  | CODE_BLOCK      | x1b[90m   | ^```     |
  | H1              | x1b[31;1m | ^#       |
  | H2              | x1b[32;1m | ^##      |
@@ -43,17 +43,17 @@ The following markdown is processed:
  | H6              | x1b[34m   | ^######  |
  | HORIZONTAL_RULE | x1b[36m   | ---      |
  | INLINE_CODE     | x1b[97m   | ``       |
- | ITALICS         | x1b[34m   | _        |
+ | ITALICS         | x1b[34m   | *        |
  | LIST            | x1b[36m   | ^*       |
  | RESET           | x1b[0m    |          |
- | STRIKETHROUGH   | x1b[2m    |          |
+ | STRIKETHROUGH   | x1b[2m    | ~~       |
  | TABLE_BLOCK     | x1b[90m   | \|*       |
 
 For each line of input to `md2ansi`, the following transformations are carried out, in this order:
 
   | transform | match |
   | :- | - |
-  | Code Block | ^```
+  | Code_Block | ^```
   | Tables  | ^[space]|space
   | Horizontal_Rules  | ^--- ^=== ^___
   | Blockquotes  | ^\>
@@ -61,9 +61,9 @@ For each line of input to `md2ansi`, the following transformations are carried o
   | Italics | *
   | Strikethrough  | ~~
   | Inline_Code  | `(.*?)`
-  | List* | ^[space]*\*space[.*]
-  | List- | ^[space]*\-space[.*]
-  | Headers | ^#..#space(.*)
+  | List_star | ^[space]*\*space[.*]
+  | List_dash | ^[space]*\-space[.*]
+  | Headers | ^#[#....]}space(.*)
 
 ### SYNOPSIS
 
@@ -79,16 +79,16 @@ Markdown formatted input stream via stdin. Required if `file.md` not specified.
 
 ### EXAMPLES:
 
-```bash
+~~~bash
 md2ansi < README.md
 
-md2ansi < *.md
+md2ansi < \*.md
 
 md2ansi file1.md
 
 md2ansi file1.md file2.md file3.md < file4.md
 
-```
+~~~
 
 ### REQUIRES
 
