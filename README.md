@@ -1,4 +1,4 @@
-## **md2ansi - simple terminal markdown to ansi translator**
+# **md2ansi** - simple terminal markdown to ansi translator
 
 ### DESCRIPTION
 

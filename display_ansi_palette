@@ -1,0 +1,60 @@
+#!/bin/bash
+set -e
+
+display_ansi_palette() {
+  local -i i
+
+  display_colour() {
+    local mode="$1"
+    local code="$2"
+    echo -en "\e[${mode};5;${code}m$(center_text 9 "$mode;5;$code")\e[0m"
+  }
+
+  echo -e "\e[0m\e[3mANSI 256-colour palette\e[32m"
+  echo
+
+  # Standard 16 colours
+  echo -e "\e[3mStandard 16 colours:\e[32m"
+  for i in {0..15}; do
+    display_colour 38 "$i"
+    display_colour 48 "$i"
+    ((((i+1)%4) == 0)) && echo
+  done
+  echo
+
+  # High-intensity 16 colours
+  echo -e "\e[3mHigh-intensity 6x6x6 colour cube (16-231):\e[32m"
+  for i in {16..231}; do
+    display_colour 38 "$i"
+    display_colour 48 "$i"
+    ((((i-15)%4) == 0)) && echo
+  done
+  echo
+
+  # Grayscale colours
+  echo -e "\e[3mGrayscale colours (232-255):\e[32m"
+  for i in {232..255}; do
+    display_colour 38 "$i"
+    display_colour 48 "$i"
+    ((((i-231)%4) == 0)) && echo
+  done
+  echo
+}
+
+center_text() {
+  local -i w=$1; shift
+  local -- text
+  text=$(trim "$*")
+  ((${#text} >= w)) && { echo "${text:0:$w}"; return 0; }
+  local -i lpad
+  lpad=$(((w - ${#text}) / 2))
+  local -i rpad
+  rpad=$(((w - ${#text}) - lpad))
+  text=$(printf '%s%s%s' "$(printf "%0.s " $(seq 1 $lpad))" \
+                  "$text" \
+                  "$(printf "%0.s " $(seq 1 $rpad))")
+  echo -n "${text:0:$w}"
+}
+declare -fx center_text
+
+display_ansi_palette | less -FXRS
