@@ -1,9 +1,10 @@
-# ANSI colours
 
-ANSI escape codes that can be used to modify text colour and style in a Bash terminal.
+# ANSI colours for Fun and Profit
 
-These codes are prefixed with `\\\\x1b[` and suffixed with `m`.
-
+> ANSI escape codes can be used to modify text colour and style in a Bash terminal.
+>
+> These codes are prefixed with `\x1b[` and suffixed with `m`.
+>
 
 ### Foreground (Text) Colour Codes
 
@@ -69,6 +70,4 @@ These codes are prefixed with `\\\\x1b[` and suffixed with `m`.
 - To reset all attributes to default: `\\\\x1b[0m`
 
 You can combine multiple codes by separating them with semicolons. For example, to set the text to red and bold, you can use `\\\\x1b[31;1m`.
-
-Support for ANSI codes can vary between different terminal emulators. Most modern terminals handle these codes well, but some older or less common ones might not support all features.
 
