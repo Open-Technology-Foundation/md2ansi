@@ -1,17 +1,13 @@
 #!/bin/bash
 #shellcheck disable=SC2034
 set -e
-declare -- _ent_0=$(readlink -fn -- "$0") || _ent_0=''
-declare -- PRG=${_ent_0##*/}
-declare -- PRGDIR=${_ent_0%/*}
-declare -- version='0.4.20'
 
 md2ansi() {
+  # try to inherit current global COLUMNS
   declare -Ii COLUMNS
-  ((COLUMNS)) || COLUMNS=78
-
+  COLUMNS=${COLUMNS:-$(tput cols 2>/dev/null || echo '78')}
   # Borrow IFS
-  local -I IFS
+  declare -I IFS
   # ANSI Colour Palette
   local -- \
     TEXT="\x1b[37;40;2m" \
@@ -49,7 +45,6 @@ md2ansi() {
 
     # Tables ^[space]|space
     if [[ "$line" =~ ^([[:space:]]*)\|(.*) ]]; then
-#    if [[ $line  =~ ^[[:space:]]*\| ]]; then
       table_indent="${#BASH_REMATCH[1]}"
       local -a  _cols=()
       local -ai _max_widths=()
@@ -245,8 +240,11 @@ trim() {
 }
 declare -fx trim
 
-# In script.sh
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then #=====================================
+declare -- _ent_0=$(readlink -fn -- "$0") || _ent_0=''
+declare -- PRG=${_ent_0##*/}
+declare -- PRGDIR=${_ent_0%/*}
+declare -- version='0.4.20'
 _main() {
   usage() {
   cat <<EOT
