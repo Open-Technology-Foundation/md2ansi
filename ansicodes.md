@@ -6,21 +6,22 @@
 > These codes are prefixed with `\x1b[` and suffixed with `m`.
 >
 
-### Foreground (Text) Colour Codes
+## Foreground (Text) Colour Codes
 
     | Description | ANSI Code |
-|-------------|-----------|
-| Black       | `30`      |
-| Red         | `31`      |
-| Green       | `32`      |
-| Yellow      | `33`      |
-| Blue        | `34`      |
-| Magenta     | `35`      |
-| Cyan        | `36`      |
-| White       | `37`      |
+    |-------------|-----------|
+    | Black       | `30`      |
+    | Red         | `31`      |
+    | Green       | `32`      |
+    | Yellow      | `33`      |
+    | Blue        | `34`      |
+    | Magenta     | `35`      |
+    | Cyan        | `36`      |
+    | White       | `37`      |
 
+---
 
-### Background Colour Codes
+## Background Colour Codes
 
 | Description | ANSI Code |
 |-------------|-----------|
@@ -33,8 +34,9 @@
 | Cyan        | `46`      |
 | White       | `47`      |
 
+---
 
-### Text Style Codes
+## Text Style Codes
 
 | Description     | ANSI Code |
 |-----------------|-----------|
@@ -49,8 +51,9 @@
 | Hidden          | `8`       |
 | Strike-through  | `9`       |
 
+---
 
-### Resetting Text Style Codes
+## Resetting Text Style Codes
 
 | Description     | ANSI Code |
 |-----------------|-----------|
@@ -63,8 +66,9 @@
 | Reset Hidden    | `28`      |
 | Reset Strikethrough | `29`     |
 
+---
 
-### Usage Examples
+## Usage Examples
 
 - To set the text colour to red: `\\\\x1b[31m`
 - To set the background colour to blue: `\\\\x1b[44m`
