@@ -57,7 +57,7 @@ md2ansi() {
         line="${line:1}"
         ((${#line})) \
           && [[ "${line: -1}" == '|' ]] \
-          && _line="${line:0:${#_line}-1}"
+          && _line="${line:0:${#line}-1}"
         # Split the line into columns
         IFS='|' read -ra _cols <<< "${line:1}"
         ((_cols_n)) || _cols_n=${#_cols[@]}
