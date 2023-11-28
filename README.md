@@ -1,4 +1,6 @@
-# **MD2ANSI** - markdown to ansi translator for Bash terminal
+# **MD2ANSI**
+
+### Markdown to ANSI translator for Bash terminal
 
 ## DESCRIPTION
 
@@ -26,12 +28,17 @@ Print formatted ANSI output to terminal from Markdown file.md or Markdown input 
 
 * Headers: Markdown for headers with the corresponding ANSI color codes.
 
-# h1
-## h2
-### h3
-#### h4
-##### h5
-###### h6
+# h1 header 1
+
+## h2 header 2
+
+### h3 header 3
+
+#### h4 header 4
+
+##### h5 header 5
+
+###### h6 header 6
 
 * General Text Formatting: The `fmt` command is optionally used to wrap and format general text content.
 
@@ -76,13 +83,11 @@ For each line of input to `md2ansi`, the following transformations are carried o
 
 **`md2ansi [file.md [...]] [< md_input_stream]`**
 
-`file.md`
+  `file.md`
+      Markdown formatted file. Optional.
 
-Markdown formatted file. Optional.
-
-`md_input_stream`
-
-Markdown formatted input stream via stdin. Required if `file.md` not specified.
+  `md_input_stream`
+      Markdown formatted input stream via stdin. Required if `file.md` not specified.
 
 ## EXAMPLES:
 
@@ -94,7 +99,6 @@ md2ansi < \*.md
 md2ansi file1.md
 
 md2ansi file1.md file2.md file3.md < file4.md
-
 ~~~
 
 ## REQUIRES
@@ -109,7 +113,4 @@ Report bugs and deficiencies on the [Open Technology github page](https://github
 
 Copyright © 2022-2023 [Indonesian Open Technology Foundation](https://yatti.id).  License GPLv3+: GNU GPL version 3 or later [GNU Licences](https://gnu.org/licenses/gpl.html).  This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
 
-## SEE ALSO
-
-[YaTTI github](https://github.com/Open-Technology-Foundation/)
 
