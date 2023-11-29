@@ -6,7 +6,7 @@
 
 Print formatted ANSI output to terminal from Markdown file.md or Markdown input stream.
 
-`md2ansi` is 100% core `Bash`.
+`md2ansi` is 100% core Bash.
 
 `md2ansi` converts Markdown streams into a terminal representation using ANSI escape sequences for formatting. It defines various ANSI color codes for different Markdown elements such as code blocks, tables, headers, blockquotes, italics, bold, strikethrough, inline code, and lists.
 
@@ -81,7 +81,7 @@ For each line of input to `md2ansi`, the following transformations are carried o
 
 ## SYNOPSIS
 
-**`md2ansi [file.md [...]] [< md_input_stream]`**
+**`md2ansi [-VhD] [file.md [...]] [< md_input_stream]`**
 
   `file.md`
       Markdown formatted file. Optional.
@@ -103,7 +103,7 @@ md2ansi file1.md file2.md file3.md < file4.md
 
 ## REQUIRES
 
-Bash 5.1
+Bash >= 5
 
 ## REPORTING BUGS
 
@@ -112,5 +112,4 @@ Report bugs and deficiencies on the [Open Technology github page](https://github
 ## COPYRIGHT
 
 Copyright © 2022-2023 [Indonesian Open Technology Foundation](https://yatti.id).  License GPLv3+: GNU GPL version 3 or later [GNU Licences](https://gnu.org/licenses/gpl.html).  This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
-
 
