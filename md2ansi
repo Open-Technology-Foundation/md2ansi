@@ -54,7 +54,7 @@ md2ansi() {
       table_indent="${#BASH_REMATCH[1]}"
       local -a  _cols=()
       local -ai _max_widths=()
-      local -i  _cols_n=0 _i _nextrow=0
+      local -i  _cols_n=0 _i=0 _nextrow=0
       local --  _col _row
       local -A  _table_rows=()
       while [[ $line =~ ^[[:space:]]*\| ]]; do
@@ -69,18 +69,18 @@ md2ansi() {
         ((_cols_n)) || _cols_n=${#_cols[@]}
         # Remove leading and trailing spaces from each column
         for _i in "${!_cols[@]}"; do
-          _cols[$_i]="$(trim -e "${_cols[$_i]}")"
+          _cols[_i]="$(trim -e "${_cols[_i]}")"
         done
         # Determine the max width for each column
         for _i in "${!_cols[@]}"; do
-          [[ ! -v _max_widths[$_i] ]] && _max_widths[$_i]=0
-          ((${#_cols[$_i]} > ${_max_widths[$_i]})) \
-            && _max_widths[$_i]=${#_cols[$_i]}
+          [[ ! -v _max_widths[$_i] ]] && _max_widths[_i]=0
+          ((${#_cols[_i]} > ${_max_widths[_i]})) \
+            && _max_widths[_i]=${#_cols[_i]}
         done
         # Add the column values to table row
         for((_i=0; _i<_cols_n; _i++)); do
           _col="${_cols[$_i]}"
-          _table_rows[$_nextrow,$_i]="$_col"
+          _table_rows[$_nextrow,_i]="$_col"
         done
         _nextrow+=1
         IFS= read -r line || break
@@ -134,7 +134,7 @@ md2ansi() {
 
     # Horizontal_Rules ^--- ^=== ^___
     if [[ ${line:0:3} == '---' ||  ${line:0:3} == '==='  ||  ${line:0:3} == '___' ]]; then
-      echo -e "\r${HR}$(head -c "$((${COLUMNS:-78} - 1))" < /dev/zero | tr '\0' "${line:0:1}")$RESET"
+      echo -e "${HR}$(head -c "$((${COLUMNS:-78} - 1))" < /dev/zero | tr '\0' "${line:0:1}")$RESET"
       continue
     fi
 
