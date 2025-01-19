@@ -1,115 +1,108 @@
-# **MD2ANSI**
+# MD2ANSI
 
-### Markdown to ANSI translator for Bash terminal
+A Python-based Markdown to ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
 
-## DESCRIPTION
+## Features
 
-Print formatted ANSI output to terminal from Markdown file.md or Markdown input stream.
+- **Headers** (H1-H6) with distinct colors
+- **Lists** (unordered)
+- **Code Blocks** (fenced with ``` or ~~~)
+- **Tables** (pipe-delimited with alignment support)
+- **Blockquotes**
+- **Horizontal Rules**
+- **Inline Formatting:**
+  - Bold (**text**)
+  - Italic (*text*)
+  - Strikethrough (~~text~~)
+  - Inline code (`code`)
 
-`md2ansi` is 100% core Bash.
+## Installation
 
-`md2ansi` converts Markdown streams into a terminal representation using ANSI escape sequences for formatting. It defines various ANSI color codes for different Markdown elements such as code blocks, tables, headers, blockquotes, italics, bold, strikethrough, inline code, and lists.
+Clone the repository and make the script executable:
 
-* Code Blocks: Detects code block markers (lines starting with "\u0060\u0060\u0060") and applies the appropriate formatting to display the code block content.
+```bash
+git clone https://github.com/Open-Technology-Foundation/md2ansi
+cd md2ansi
+chmod +x md2ansi.py
+```
 
-* Tables: Detects lines starting with "|" to identify table rows. It processes the table rows, determines the maximum width for each column, and formats the table accordingly.
+Create a symbolic link (optional):
+```bash
+ln -s md2ansi.py md2ansi
+```
 
-* Horizontal Rules: Detects lines consisting of "---", "===", or "\_\_\_" to create horizontal rules in the output.
+## Usage
 
-* Blockquotes: Lines starting with ">" are treated as blockquotes and indented accordingly.
+```bash
+# Process a single markdown file
+./md2ansi README.md
 
-* Italics and Bold: Markdown for italics and bold with the corresponding ANSI color codes.
+# Process multiple files
+./md2ansi file1.md file2.md
 
-* Strikethrough: Markdown for strikethrough with the corresponding ANSI color code.
+# Process markdown from stdin
+cat README.md | ./md2ansi
 
-* Inline Code: Markdown for inline code with the corresponding ANSI color code.
+# Force specific terminal width
+./md2ansi --width 100 README.md
+```
 
-* Lists: The script indents lines starting with "\u002A" or "-" to represent unordered lists.
+## Examples
 
-* Headers: Markdown for headers with the corresponding ANSI color codes.
+### Headers
+```markdown
+# H1 Header
+## H2 Header
+### H3 Header
+```
 
-# h1 header 1
+### Lists
+```markdown
+* Item 1
+* Item 2
+  * Subitem 2.1
+```
 
-## h2 header 2
+### Tables
+```markdown
+| Align Left | Center | Align Right |
+|:-----------|:------:|------------:|
+| Left       | Center |       Right |
+```
 
-### h3 header 3
+### Code Blocks
+````markdown
+```python
+def hello():
+    print("Hello, World!")
+```
+````
 
-#### h4 header 4
+## Requirements
 
-##### h5 header 5
+- Python 3.6+
+- Linux/Unix terminal with ANSI color support
 
-###### h6 header 6
+## Technical Details
 
-* General Text Formatting: The `fmt` command is optionally used to wrap and format general text content.
+The script uses ANSI escape sequences to provide colored output:
+- Headers use distinct colors (yellow to purple gradient)
+- Code blocks and tables use gray
+- Lists and horizontal rules use cyan
+- Blockquotes use a dark background
+- Regular text uses light gray
 
-The following markdown codes are processed:
+Terminal width is auto-detected with graceful fallbacks to ensure proper text wrapping.
 
- | function    | ansi      | markdown |
- | -:          | :-        | -        |
- | BLOCKQUOTE  | x1b[35m   | ^>       |
- | BOLD        | x1b[31;1m | **       |
- | CODE_BLOCK  | x1b[90m   | ^```     |
- | H1          | x1b[31;1m | ^#       |
- | H2          | x1b[32;1m | ^##      |
- | H3          | x1b[33;1m | ^###     |
- | H4          | x1b[33m   | ^####    |
- | H5          | x1b[34;1m | ^#####   |
- | H6          | x1b[34m   | ^######  |
- | HR          | x1b[36m   | ---      |
- | CODE        | x1b[97m   | ``       |
- | ITALIC      | x1b[34m   | *        |
- | LIST        | x1b[36m   | ^*       |
- | RESET       | x1b[0m    |          |
- | STRIKE      | x1b[2m    | ~~       |
- | TABLE_BLOCK | x1b[90m   | \\|*       |
+## Contributing
 
-For each line of input to `md2ansi`, the following transformations are carried out, in this order:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-  | transform | match |
-  | :- | - |
-  | Code_Block | ^```
-  | Tables  | ^[space]|space
-  | Horizontal_Rules  | ^--- ^=== ^___
-  | Blockquotes  | ^\>
-  | Bold | **
-  | Italics | *
-  | Strikethrough  | ~~
-  | Inline_Code  | `(.*?)`
-  | List_star | ^[space]*\*space[.*]
-  | List_dash | ^[space]*\-space[.*]
-  | Headers | ^#[#....]}space(.*)
+## License
 
-## SYNOPSIS
+Copyright © 2022-2025 [Indonesian Open Technology Foundation](https://yatti.id)
+Licensed under GPL-3.0. See LICENSE file for details.
 
-**`md2ansi [-VhD] [file.md [...]] [< md_input_stream]`**
+## Bug Reports
 
-  `file.md`
-      Markdown formatted file. Optional.
-
-  `md_input_stream`
-      Markdown formatted input stream via stdin. Required if `file.md` not specified.
-
-## EXAMPLES:
-
-~~~bash
-md2ansi < README.md
-
-md2ansi < \*.md
-
-md2ansi file1.md
-
-md2ansi file1.md file2.md file3.md < file4.md
-~~~
-
-## REQUIRES
-
-Bash >= 5
-
-## REPORTING BUGS
-
-Report bugs and deficiencies on the [Open Technology github page](https://github.com/Open-Technology-Foundation/md2ansi)
-
-## COPYRIGHT
-
-Copyright © 2022-2023 [Indonesian Open Technology Foundation](https://yatti.id).  License GPLv3+: GNU GPL version 3 or later [GNU Licences](https://gnu.org/licenses/gpl.html).  This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by law.
-
+Please report any issues on the [GitHub repository](https://github.com/Open-Technology-Foundation/md2ansi/issues).
