@@ -418,6 +418,10 @@ def main():
     "--width", type=int,
     help="Force specific terminal width (default: auto-detect)"
   )
+  parser.add_argument(
+    "-V", "--version", action="version", version="0.9.0",
+    help="Show version information and exit"
+  )
   args = parser.parse_args()
 
   # Use specified width or auto-detect
