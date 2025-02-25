@@ -18,6 +18,7 @@ import re
 import shutil
 import argparse
 import signal
+from typing import List, Tuple, Optional
 
 # --------------------------------------------------------------------
 # ANSI escape sequences
@@ -25,6 +26,7 @@ import signal
 ANSI_RESET = "\x1b[0m"
 ANSI_BOLD = "\x1b[1m"
 ANSI_DIM = "\x1b[2m"
+ANSI_ITALIC = "\x1b[3m"  # Added italic style
 ANSI_STRIKE = "\x1b[9m"
 
 COLOR_H1 = "\x1b[38;5;226m"
@@ -43,19 +45,26 @@ COLOR_TABLE = "\x1b[90m"
 # --------------------------------------------------------------------
 def sigint_handler(signum, frame):
   """Handle Ctrl-C gracefully."""
-  print("\nInterrupted by user.")
+  print(f"{ANSI_RESET}\nInterrupted by user.")
   sys.exit(0)
 
 signal.signal(signal.SIGINT, sigint_handler)
 
 # --------------------------------------------------------------------
-def get_terminal_width():
+def get_terminal_width() -> int:
   """
   Get terminal width using multiple methods with fallbacks.
   Returns a reasonable default (80) if all methods fail.
   """
   try:
-    # Method 1: Using stty
+    # Method 1: Using shutil (but only if we're connected to a real terminal)
+    import os
+    if os.isatty(1):  # 1 is stdout
+      size = shutil.get_terminal_size()
+      if size.columns > 0:
+        return size.columns
+
+    # Method 2: Using stty
     import subprocess
     result = subprocess.run(['stty', 'size'],
                           stdout=subprocess.PIPE,
@@ -64,13 +73,6 @@ def get_terminal_width():
       rows, columns = map(int, result.stdout.decode().split())
       if columns > 0:
         return columns
-
-    # Method 2: Using shutil (but only if we're connected to a real terminal)
-    import os
-    if os.isatty(1):  # 1 is stdout
-      size = shutil.get_terminal_size()
-      if size.columns > 0:
-        return size.columns
 
     # Method 3: Environment variable
     if 'COLUMNS' in os.environ:
@@ -88,51 +90,66 @@ def get_terminal_width():
   return 80
 
 # --------------------------------------------------------------------
-def colorize_line(line):
+def colorize_line(line: str) -> str:
   """
   Apply inline transformations:
     - Bold (**) -> ANSI_BOLD
-    - Italic (*) -> ANSI_DIM (as an example)
+    - Italic (*) -> ANSI_ITALIC
     - Strikethrough (~~)
     - Inline code (`code`)
   """
-  # Bold: **text**
-  line = re.sub(r"\*\*(.+?)\*\*", rf"{ANSI_BOLD}\1{ANSI_RESET}{COLOR_TEXT}", line)
-  # Italics: *text*
-  line = re.sub(r"\*(.+?)\*", rf"{ANSI_DIM}\1{ANSI_RESET}{COLOR_TEXT}", line)
-  # Strikethrough: ~~text~~
-  line = re.sub(r"~~(.+?)~~", rf"{ANSI_STRIKE}\1{ANSI_RESET}{COLOR_TEXT}", line)
-
-  # Inline code: `code`
+  # We need to be careful with the order of replacements to avoid conflicts
+  
+  # Inline code: `code` (do this first to avoid conflicts with other formatting)
   def replace_code(match):
     inside = match.group(1)
-    return f"{ANSI_DIM}{inside}{ANSI_RESET}{COLOR_TEXT}"
+    return f"{COLOR_CODEBLOCK}`{inside}`{ANSI_RESET}{COLOR_TEXT}"
 
   line = re.sub(r"`([^`]+)`", replace_code, line)
+  
+  # Bold: **text**
+  line = re.sub(r"\*\*(.+?)\*\*", f"{ANSI_BOLD}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  
+  # Italics: *text* (but not if it's part of a list item)
+  line = re.sub(r"(?<!\*)\*([^\*]+)\*(?!\*)", f"{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  
+  # Strikethrough: ~~text~~
+  line = re.sub(r"~~(.+?)~~", f"{ANSI_STRIKE}\\1{ANSI_RESET}{COLOR_TEXT}", line)
 
   return line
 
 # --------------------------------------------------------------------
-def wrap_text(line, width=80):
+def wrap_text(line: str, width: int = 80) -> List[str]:
   """
-  Basic wrap by splitting on spaces. Expand or remove if desired.
+  Basic wrap by splitting on spaces. Preserves formatting.
   """
+  # If line is empty or shorter than width, return as is
+  if not line or len(line) <= width:
+    return [line]
+    
   words = line.split()
   if not words:
     return [""]
+    
   lines = []
   current = words[0]
+  
   for w in words[1:]:
-    if len(current) + len(w) + 1 <= width:
+    # Calculate visible length (without ANSI codes)
+    visible_current = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', current)
+    visible_w = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', w)
+    
+    if len(visible_current) + len(visible_w) + 1 <= width:
       current += " " + w
     else:
       lines.append(current)
       current = w
+      
   lines.append(current)
   return lines
 
 # --------------------------------------------------------------------
-def parse_table(lines, start_index):
+def parse_table(lines: List[str], start_index: int) -> Tuple[List[str], int]:
   """
   Collect consecutive table lines starting at start_index.
   Return (list_of_table_lines, next_index).
@@ -153,7 +170,7 @@ def parse_table(lines, start_index):
       break
   return table_lines, i
 
-def build_table_ansi(table_lines, term_width=80):
+def build_table_ansi(table_lines: List[str], term_width: int = 80) -> List[str]:
   """
   Given a list of lines representing a Markdown table, parse
   them into cells, then produce an ASCII/ANSI table.
@@ -170,11 +187,11 @@ def build_table_ansi(table_lines, term_width=80):
   # as data.
   alignment = []
   has_alignment_row = False
-  if len(rows) > 1 and re.match(r"^-{3,}", rows[1][0]):
-    # This is presumably the alignment row
+  if len(rows) > 1 and all(re.match(r"^:?-+:?$", cell) for cell in rows[1]):
+    # This is the alignment row
     has_alignment_row = True
     for cell in rows[1]:
-      cell = cell.lower()
+      cell = cell.strip()
       if cell.startswith(':') and cell.endswith(':'):
         alignment.append('center')
       elif cell.endswith(':'):
@@ -192,7 +209,7 @@ def build_table_ansi(table_lines, term_width=80):
   num_cols = max(len(r) for r in data_rows) if data_rows else 0
   col_widths = [0] * num_cols
   for r in data_rows:
-    for i, cell in enumerate(r):
+    for i, cell in enumerate(r[:num_cols]):
       col_widths[i] = max(col_widths[i], len(cell))
 
   # Fallback alignment if needed
@@ -206,62 +223,86 @@ def build_table_ansi(table_lines, term_width=80):
 
   # Produce lines
   rendered_lines = []
-  rendered_lines.append(COLOR_TABLE + horizontal + ANSI_RESET)
+  rendered_lines.append(f"{COLOR_TABLE}{horizontal}{ANSI_RESET}")
+  
   for row_i, row in enumerate(data_rows):
     line_builder = "|"
-    for col_i, cell in enumerate(row):
+    
+    # Ensure row has enough cells
+    row_padded = row + [""] * (num_cols - len(row))
+    
+    for col_i, cell in enumerate(row_padded):
       cell_text = cell
+      # Apply inline formatting to cell content
+      cell_text = colorize_line(cell_text)
+      
+      # Get visible length (without ANSI codes)
+      visible_text = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', cell_text)
+      
       # align cell
       w = col_widths[col_i]
       if alignment[col_i] == 'right':
-        cell_text = cell_text.rjust(w)
+        padding = w - len(visible_text)
+        cell_text = " " * padding + cell_text
       elif alignment[col_i] == 'center':
-        left_spaces = (w - len(cell_text)) // 2
-        right_spaces = w - len(cell_text) - left_spaces
+        left_spaces = (w - len(visible_text)) // 2
+        right_spaces = w - len(visible_text) - left_spaces
         cell_text = (" " * left_spaces) + cell_text + (" " * right_spaces)
       else:
         # left
-        cell_text = cell_text.ljust(w)
+        padding = w - len(visible_text)
+        cell_text = cell_text + " " * padding
+        
       line_builder += f" {cell_text} |"
 
-    rendered_lines.append(COLOR_TABLE + line_builder + ANSI_RESET)
-    if row_i == 0:  # after header, insert horizontal again
-      rendered_lines.append(COLOR_TABLE + horizontal + ANSI_RESET)
-  rendered_lines.append(COLOR_TABLE + horizontal + ANSI_RESET)
+    rendered_lines.append(f"{COLOR_TABLE}{line_builder}{ANSI_RESET}")
+    if row_i == 0 and has_alignment_row:  # after header, insert horizontal again
+      rendered_lines.append(f"{COLOR_TABLE}{horizontal}{ANSI_RESET}")
+      
+  rendered_lines.append(f"{COLOR_TABLE}{horizontal}{ANSI_RESET}")
 
   return rendered_lines
 
 # --------------------------------------------------------------------
-def md2ansi(lines, term_width=80):
+def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
   """
   Convert Markdown lines to ANSI-colored lines, yielding lines to print.
   We detect blocks (tables, code blocks) and process them accordingly.
   """
+  result = []
   in_code_block = False
   code_fence = None
   i = 0
+  
   while i < len(lines):
     original_line = lines[i]
     line = original_line.rstrip("\n")
 
     # Detect fenced code blocks
-    if re.match(r"^(```|~~~)", line):
+    code_fence_match = re.match(r"^(```|~~~)(.*)$", line)
+    if code_fence_match:
+      fence = code_fence_match.group(1)
+      lang = code_fence_match.group(2).strip()
+      
       if in_code_block:
         # closing fence
         in_code_block = False
-        yield f"{COLOR_CODEBLOCK}{code_fence}{ANSI_RESET}{COLOR_TEXT}"
+        result.append(f"{COLOR_CODEBLOCK}{code_fence}{ANSI_RESET}")
         i += 1
         continue
       else:
         # opening fence
         in_code_block = True
-        code_fence = line[:3]
-        yield f"{COLOR_CODEBLOCK}{code_fence}{ANSI_RESET}{COLOR_TEXT}"
+        code_fence = fence
+        fence_line = f"{COLOR_CODEBLOCK}{fence}"
+        if lang:
+          fence_line += f" {lang}"
+        result.append(f"{fence_line}{ANSI_RESET}")
         i += 1
         continue
 
     if in_code_block:
-      yield f"{COLOR_CODEBLOCK}{line}{ANSI_RESET}"
+      result.append(f"{COLOR_CODEBLOCK}{line}{ANSI_RESET}")
       i += 1
       continue
 
@@ -270,24 +311,23 @@ def md2ansi(lines, term_width=80):
       table_block, next_i = parse_table(lines, i)
       # Build the table
       table_ansi = build_table_ansi(table_block, term_width=term_width)
-      for row_str in table_ansi:
-        yield row_str
+      result.extend(table_ansi)
       i = next_i
       continue
 
     # Horizontal rules: --- / === / ___
     if re.match(r"^(\-{3,}|={3,}|_{3,})\s*$", line):
-      yield COLOR_HR + ("─" * (term_width - 1)) + ANSI_RESET
+      result.append(f"{COLOR_HR}{('─' * (term_width - 1))}{ANSI_RESET}")
       i += 1
       continue
 
     # Blockquotes: lines starting with >
     if re.match(r"^\s*>", line):
       content = re.sub(r"^\s*> ?", "", line)
+      content = colorize_line(content)
       content_wrapped = wrap_text(content, term_width - 4)
       for wrapped_segment in content_wrapped:
-        yield (f"{COLOR_TEXT}  > {COLOR_BLOCKQUOTE}"
-               f"{wrapped_segment}{ANSI_RESET}{COLOR_TEXT}")
+        result.append(f"{COLOR_TEXT}  > {COLOR_BLOCKQUOTE}{wrapped_segment}{ANSI_RESET}")
       i += 1
       continue
 
@@ -309,27 +349,61 @@ def md2ansi(lines, term_width=80):
         color = COLOR_H5
       else:
         color = COLOR_H6
-      yield f"{color}{text}{ANSI_RESET}{COLOR_TEXT}"
+      
+      # Apply inline formatting to heading text
+      text = colorize_line(text)
+      result.append(f"{color}{text}{ANSI_RESET}")
       i += 1
       continue
 
     # Unordered lists: lines starting with '-' or '*'
-    if re.match(r"^\s*[\-\*]\s+", line):
-      item_content = re.sub(r"^\s*[\-\*]\s+", "", line)
+    list_match = re.match(r"^(\s*)[\-\*]\s+(.*)", line)
+    if list_match:
+      indent = list_match.group(1)
+      item_content = list_match.group(2)
       item_content = colorize_line(item_content)
-      segments = wrap_text(item_content, term_width - 4)
-      yield f"  {COLOR_LIST}* {COLOR_TEXT}{segments[0]}"
+      
+      # Calculate indentation level for nested lists
+      indent_level = len(indent) // 2
+      bullet_indent = "  " * indent_level
+      text_indent = "  " * (indent_level + 1)
+      
+      segments = wrap_text(item_content, term_width - len(text_indent) - 2)
+      result.append(f"{bullet_indent}{COLOR_LIST}* {COLOR_TEXT}{segments[0]}")
       for seg in segments[1:]:
-        yield f"    {seg}"
+        result.append(f"{text_indent}{seg}")
       i += 1
       continue
 
     # Otherwise, normal text. Apply inline expansions and wrap.
-    line_colored = colorize_line(line)
-    for seg in wrap_text(line_colored, term_width):
-      yield seg
+    if line.strip():  # Skip empty lines
+      line_colored = f"{COLOR_TEXT}{colorize_line(line)}"
+      segments = wrap_text(line_colored, term_width)
+      result.extend(segments)
+    else:
+      result.append("")  # Preserve empty lines
 
     i += 1
+
+  return result
+
+# --------------------------------------------------------------------
+def process_file(filename: Optional[str] = None, term_width: int = 80) -> List[str]:
+  """Process a single file or stdin and return formatted lines."""
+  try:
+    if filename:
+      with open(filename, "r", encoding="utf-8") as f:
+        content = f.read()
+    else:
+      content = sys.stdin.read()
+      
+    all_lines = content.splitlines()
+    return md2ansi(all_lines, term_width=term_width)
+    
+  except FileNotFoundError:
+    return [f"ERROR: '{filename}' not found."]
+  except Exception as e:
+    return [f"ERROR: {str(e)}"]
 
 # --------------------------------------------------------------------
 def main():
@@ -349,24 +423,28 @@ def main():
   # Use specified width or auto-detect
   term_width = args.width if args.width else get_terminal_width()
 
+  # Print initial color reset to ensure terminal is in a clean state
+  print(ANSI_RESET, end="")
+  
   if args.files:
-    all_lines = []
     for fname in args.files:
-      try:
-        with open(fname, "r", encoding="utf-8") as f:
-          all_lines.extend(f.readlines())
-      except FileNotFoundError:
-        sys.stderr.write(f"ERROR: '{fname}' not found.\n")
-        sys.exit(1)
-    for line in md2ansi(all_lines, term_width=term_width):
-      print(line)
+      formatted_lines = process_file(fname, term_width)
+      for line in formatted_lines:
+        print(line)
+      # Add a newline between files if processing multiple files
+      if len(args.files) > 1 and fname != args.files[-1]:
+        print()
   else:
     # Read from stdin
-    data = sys.stdin.read()
-    all_lines = data.splitlines()
-    for line in md2ansi(all_lines, term_width=term_width):
+    formatted_lines = process_file(None, term_width)
+    for line in formatted_lines:
       print(line)
+      
+  # Ensure terminal colors are reset at the end
+  print(ANSI_RESET, end="")
 
 # --------------------------------------------------------------------
 if __name__ == "__main__":
   main()
+
+#fin
