@@ -2,7 +2,7 @@
 
 A powerful Python-based Markdown to ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 
 ## Features
