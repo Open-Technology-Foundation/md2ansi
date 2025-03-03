@@ -42,8 +42,8 @@ md2ansi README.md
 # Process multiple files
 md2ansi file1.md file2.md
 
-# Process markdown from stdin
-cat README.md | md2ansi
+# Process markdown from stdin and pipe to less
+cat README.md | md2ansi | less
 
 # Force specific terminal width
 md2ansi --width 100 README.md
