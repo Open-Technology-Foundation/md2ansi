@@ -1,6 +1,6 @@
 # MD2ANSI
 
-A powerful Python-based Markdown to ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
+A Python-based Markdown to ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
 
 ![Version](https://img.shields.io/badge/version-0.9.5-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
@@ -39,14 +39,36 @@ A powerful Python-based Markdown to ANSI terminal formatter that renders markdow
 
 ## Installation
 
-Clone the repository and make the script executable:
+### Method 1: Automatic Installation (Recommended)
+
+Use the provided installation script for system-wide installation:
+
+```bash
+# Download and run the installation script
+curl -sL https://raw.githubusercontent.com/Open-Technology-Foundation/md2ansi/main/md2ansi-install.sh | bash
+
+# Or if you've already cloned the repository
+cd md2ansi
+./md2ansi-install.sh
+```
+
+The installation script will:
+- Create a directory at `/usr/local/share/md2ansi`
+- Clone the repository into that directory
+- Set proper permissions
+- Create symbolic links in `/usr/local/bin` for `md2ansi` and `md` commands
+
+### Method 2: Manual Installation
+
+Clone the repository and make the scripts executable:
 
 ```bash
 git clone https://github.com/Open-Technology-Foundation/md2ansi
 cd md2ansi
-chmod +x md2ansi.py
-# Create a symbolic link (optional):
-sudo ln -s $(pwd)/md2ansi.py /usr/local/bin/md2ansi
+chmod +x md2ansi.py md2ansi md
+# Create symbolic links (optional):
+sudo ln -s $(pwd)/md2ansi /usr/local/bin/md2ansi
+sudo ln -s $(pwd)/md /usr/local/bin/md
 ```
 
 ## Usage
@@ -55,11 +77,14 @@ sudo ln -s $(pwd)/md2ansi.py /usr/local/bin/md2ansi
 # Process a single markdown file
 md2ansi README.md
 
+# View markdown file with pager (uses the 'md' wrapper script)
+md README.md
+
 # Process multiple files
 md2ansi file1.md file2.md
 
 # Process markdown from stdin and pipe to less
-cat README.md | md2ansi | less
+cat README.md | md2ansi | less -R
 
 # Force specific terminal width
 md2ansi --width 100 README.md
@@ -70,12 +95,16 @@ md2ansi --no-footnotes --no-tables README.md
 
 # Plain text mode (disable all formatting)
 md2ansi --plain README.md
+
+# Debug mode (shows parsing information)
+md2ansi --debug README.md
 ```
 
 ### Command Line Options
 
 * `-h`, `--help`: Show help message and exit
 * `-V`, `--version`: Show version information and exit
+* `-D`, `--debug`: Enable debug mode (shows parsing information)
 * `--width WIDTH`: Force specific terminal width (default: auto-detect)
 * `--no-footnotes`: Disable footnotes processing
 * `--no-syntax-highlight`: Disable syntax highlighting in code blocks
@@ -172,6 +201,8 @@ You can also **combine *different* ~~styles~~ `together`**.
 
 ## Technical Details
 
+### ANSI Formatting
+
 MD2ANSI uses ANSI escape sequences to provide colored output in the terminal:
 
 - Headers use a distinct color gradient (yellow → orange → green → blue → purple)
@@ -183,6 +214,15 @@ MD2ANSI uses ANSI escape sequences to provide colored output in the terminal:
 - Regular text uses light gray
 
 Terminal width is auto-detected with graceful fallbacks to ensure proper text wrapping. The script handles ANSI escape sequences correctly when calculating line lengths, ensuring that formatting is preserved when wrapping text.
+
+### Included Scripts
+
+The repository includes several utility scripts:
+
+- `md2ansi`: The main Python script for converting Markdown to ANSI-colored terminal output
+- `md`: A wrapper script that pipes markdown files through md2ansi and the `less` pager with proper options
+- `md2ansi-install.sh`: Installation script for system-wide deployment
+- `display_ansi_palette`: A utility script to display the ANSI color palette in your terminal
 
 ## Performance Test
 
@@ -212,6 +252,8 @@ Here's a complex example that demonstrates MD2ANSI's capabilities:
 
 - Python 3.8+
 - Linux/Unix terminal with ANSI color support
+- For viewing files with the `md` script: `less` pager with `-R` flag support
+- No external Python dependencies required
 
 ## Contributing
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 display_ansi_palette() {
   local -i i
@@ -58,3 +58,5 @@ center_text() {
 declare -fx center_text
 
 display_ansi_palette | less -FXRS
+
+#fin
