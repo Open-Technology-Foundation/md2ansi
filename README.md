@@ -2,15 +2,26 @@
 
 A powerful Python-based Markdown to ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
 
-![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.9.5-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 
 ## Features
 
 - **Headers** (H1-H6) with distinct color gradients
-- **Lists** (unordered) with proper nesting and indentation
-- **Code Blocks** (fenced with ``` or ~~~) with language detection
-- **Tables** (pipe-delimited with alignment support)
+- **Lists:**
+  - Unordered lists with proper nesting and indentation
+  - Ordered lists with nesting support
+  - Task lists with checkboxes ([ ] and [x])
+- **Code Blocks:**
+  - Fenced with ``` or ~~~ with language detection
+  - Syntax highlighting for Python, JavaScript, and Bash
+  - Support for language aliases (py, js, sh)
+  - Handles multiline strings and comments in code blocks
+  - Improved ANSI escape sequence handling for clean display
+- **Tables:**
+  - Pipe-delimited with alignment support
+  - Enhanced formatting with mixed styling in cells
+  - Handles tables with mismatched column counts
 - **Blockquotes** with background highlighting
 - **Horizontal Rules** with full-width rendering
 - **Inline Formatting:**
@@ -18,8 +29,13 @@ A powerful Python-based Markdown to ANSI terminal formatter that renders markdow
   - *Italic* text rendering
   - ~~Strikethrough~~ text rendering
   - `Inline code` with distinct styling
+  - [Links](https://example.com) with underlined styling
+  - ![Image](url) with alt text placeholder
+  - [^1] Footnote references and rendering
+  - Better nested formatting (***bold italic***, etc.)
 - **Smart text wrapping** that preserves formatting
 - **Terminal width detection** with customization options
+- **Improved error handling** with specific error messages
 
 ## Installation
 
@@ -47,7 +63,27 @@ cat README.md | md2ansi | less
 
 # Force specific terminal width
 md2ansi --width 100 README.md
+
+# Disable specific features
+md2ansi --no-syntax-highlight README.md
+md2ansi --no-footnotes --no-tables README.md
+
+# Plain text mode (disable all formatting)
+md2ansi --plain README.md
 ```
+
+### Command Line Options
+
+* `-h`, `--help`: Show help message and exit
+* `-V`, `--version`: Show version information and exit
+* `--width WIDTH`: Force specific terminal width (default: auto-detect)
+* `--no-footnotes`: Disable footnotes processing
+* `--no-syntax-highlight`: Disable syntax highlighting in code blocks
+* `--no-tables`: Disable tables formatting
+* `--no-task-lists`: Disable task lists (checkboxes) formatting
+* `--no-images`: Disable image placeholders
+* `--no-links`: Disable links formatting
+* `--plain`: Use plain text mode (disables all formatting features)
 
 ## Formatting Examples
 

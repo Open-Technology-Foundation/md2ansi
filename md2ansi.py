@@ -18,7 +18,7 @@ import re
 import shutil
 import argparse
 import signal
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 # --------------------------------------------------------------------
 # ANSI escape sequences
@@ -28,6 +28,7 @@ ANSI_BOLD = "\x1b[1m"
 ANSI_DIM = "\x1b[2m"
 ANSI_ITALIC = "\x1b[3m"  # Added italic style
 ANSI_STRIKE = "\x1b[9m"
+ANSI_UNDERLINE = "\x1b[4m"  # Underline for links
 
 COLOR_H1 = "\x1b[38;5;226m"
 COLOR_H2 = "\x1b[38;5;214m"
@@ -41,6 +42,83 @@ COLOR_CODEBLOCK = "\x1b[90m"
 COLOR_LIST = "\x1b[36m"
 COLOR_HR = "\x1b[36m"
 COLOR_TABLE = "\x1b[90m"
+COLOR_LINK = "\x1b[38;5;45m"  # Cyan-blue color for links
+
+# Syntax highlighting colors for code blocks
+COLOR_KEYWORD = "\x1b[38;5;204m"  # Pink for keywords
+COLOR_STRING = "\x1b[38;5;114m"   # Green for strings
+COLOR_NUMBER = "\x1b[38;5;220m"   # Yellow for numbers
+COLOR_COMMENT = "\x1b[38;5;245m"  # Gray for comments
+COLOR_FUNCTION = "\x1b[38;5;81m"  # Blue for function names
+COLOR_CLASS = "\x1b[38;5;214m"    # Orange for class names
+COLOR_BUILTIN = "\x1b[38;5;147m"  # Purple for built-in functions
+
+# Simple syntax highlighting rules for common languages
+SYNTAX_RULES = {
+  "python": {
+    "keywords": [
+      "and", "as", "assert", "async", "await", "break", "class", "continue", 
+      "def", "del", "elif", "else", "except", "False", "finally", "for", 
+      "from", "global", "if", "import", "in", "is", "lambda", "None", 
+      "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", 
+      "while", "with", "yield"
+    ],
+    "builtins": [
+      "abs", "all", "any", "bin", "bool", "bytearray", "bytes", "callable",
+      "chr", "classmethod", "compile", "complex", "delattr", "dict", "dir",
+      "divmod", "enumerate", "eval", "exec", "filter", "float", "format",
+      "frozenset", "getattr", "globals", "hasattr", "hash", "help", "hex",
+      "id", "input", "int", "isinstance", "issubclass", "iter", "len", "list",
+      "locals", "map", "max", "min", "next", "object", "oct", "open", "ord",
+      "pow", "print", "property", "range", "repr", "reversed", "round", "set",
+      "setattr", "slice", "sorted", "staticmethod", "str", "sum", "super",
+      "tuple", "type", "vars", "zip"
+    ],
+    "string_patterns": [r'"""(?:.|\n)*?"""', r"'''(?:.|\n)*?'''", r'"[^"\n]*"', r"'[^'\n]*'"],
+    "comment_patterns": [r"#.*$"],
+    "number_patterns": [r"\b\d+\b", r"\b\d+\.\d+\b"],
+    "function_patterns": [r"def\s+(\w+)\s*\("],
+    "class_patterns": [r"class\s+(\w+)\s*[\(:]"]
+  },
+  "javascript": {
+    "keywords": [
+      "break", "case", "catch", "class", "const", "continue", "debugger", 
+      "default", "delete", "do", "else", "export", "extends", "false", 
+      "finally", "for", "function", "if", "import", "in", "instanceof", 
+      "new", "null", "return", "super", "switch", "this", "throw", "true", 
+      "try", "typeof", "var", "void", "while", "with", "yield", "let", "static", 
+      "await", "async"
+    ],
+    "builtins": [
+      "Array", "Boolean", "Date", "Error", "Function", "JSON", "Math",
+      "Number", "Object", "RegExp", "String", "console", "document",
+      "window", "fetch", "setTimeout", "setInterval", "Promise"
+    ],
+    "string_patterns": [r'"[^"\n]*"', r"'[^'\n]*'", r"`(?:.|\n)*?`"],
+    "comment_patterns": [r"//.*$", r"/\*(?:.|\n)*?\*/"],
+    "number_patterns": [r"\b\d+\b", r"\b\d+\.\d+\b"],
+    "function_patterns": [r"function\s+(\w+)\s*\(", r"(\w+)\s*=\s*function\s*\(", r"(\w+)\s*:\s*function\s*\("],
+    "class_patterns": [r"class\s+(\w+)\s*[\{:]"]
+  },
+  "bash": {
+    "keywords": [
+      "if", "then", "else", "elif", "fi", "case", "esac", "for", "while", 
+      "until", "do", "done", "in", "function", "time", "select", "break", 
+      "continue", "return", "declare", "readonly", "local", "export", "set", 
+      "unset", "shift", "exit", "trap"
+    ],
+    "builtins": [
+      "echo", "printf", "read", "cd", "pwd", "pushd", "popd", "mkdir", "rmdir",
+      "rm", "cp", "mv", "ln", "ls", "cat", "grep", "sed", "awk", "find", "test",
+      "source", "eval", "exec", "ulimit", "umask", "wait", "kill", "sleep"
+    ],
+    "string_patterns": [r'"[^"\n]*"', r"'[^'\n]*'"],
+    "comment_patterns": [r"(^|\s)#.*$"],
+    "number_patterns": [r"\b\d+\b"],
+    "function_patterns": [r"(\w+)\s*\(\)\s*\{", r"function\s+(\w+)\s*\{"],
+    "class_patterns": []
+  }
+}
 
 # --------------------------------------------------------------------
 def sigint_handler(signum, frame):
@@ -49,6 +127,123 @@ def sigint_handler(signum, frame):
   sys.exit(0)
 
 signal.signal(signal.SIGINT, sigint_handler)
+
+# --------------------------------------------------------------------
+def sanitize_code(code: str) -> str:
+  """
+  Remove or escape ANSI patterns and other problematic sequences.
+  """
+  # Remove any existing ANSI escape sequences
+  code = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', code)
+  
+  # Fix common problematic ANSI-like patterns in code
+  code = code.replace("\\x1b", "ESC_SEQ")
+  
+  # Special handling for patterns that look like ANSI color codes
+  code = re.sub(r'\[([0-9]{1,2}(;[0-9]{1,2})*m)', r'[ANSI_CODE\1', code)
+  code = re.sub(r'\[38;5;[0-9]+m', r'[COLOR_CODE]', code)
+  
+  return code
+
+def highlight_code(code: str, language: str) -> str:
+  """
+  Apply syntax highlighting to code based on language rules.
+  Returns the code with ANSI escape sequences for syntax highlighting.
+  """
+  # Default to plain text if language not supported
+  language = language.lower().strip()
+  
+  # Common language aliases
+  lang_map = {
+    "js": "javascript",
+    "py": "python",
+    "sh": "bash",
+    "shell": "bash",
+  }
+  
+  # Map language to supported language if possible
+  if language in lang_map:
+    language = lang_map[language]
+  
+  # If language not supported, return plain code
+  if language not in SYNTAX_RULES:
+    return code
+  
+  # Sanitize the code to prevent issues with ANSI sequences
+  code = sanitize_code(code)
+  
+  rules = SYNTAX_RULES[language]
+  highlighted_code = code
+  
+  # Create a list of all keywords with word boundaries
+  keywords = [r"\b" + kw + r"\b" for kw in rules["keywords"]]
+  builtins = [r"\b" + bi + r"\b" for bi in rules["builtins"]]
+  
+  # Process comments first (they have highest priority)
+  for pattern in rules["comment_patterns"]:
+    highlighted_code = re.sub(
+      pattern, 
+      lambda m: f"{COLOR_COMMENT}{m.group(0)}{COLOR_CODEBLOCK}", 
+      highlighted_code
+    )
+  
+  # Then strings (second highest priority)
+  for pattern in rules["string_patterns"]:
+    highlighted_code = re.sub(
+      pattern, 
+      lambda m: f"{COLOR_STRING}{m.group(0)}{COLOR_CODEBLOCK}", 
+      highlighted_code
+    )
+  
+  # Then numbers
+  for pattern in rules["number_patterns"]:
+    highlighted_code = re.sub(
+      pattern, 
+      lambda m: f"{COLOR_NUMBER}{m.group(0)}{COLOR_CODEBLOCK}", 
+      highlighted_code
+    )
+  
+  # Then functions (match function definitions)
+  for pattern in rules["function_patterns"]:
+    try:
+      highlighted_code = re.sub(
+        pattern, 
+        lambda m: m.group(0).replace(m.group(1), f"{COLOR_FUNCTION}{m.group(1)}{COLOR_CODEBLOCK}"), 
+        highlighted_code
+      )
+    except Exception:
+      # Skip if there's an issue with replacement
+      pass
+  
+  # Then classes (match class definitions)
+  for pattern in rules["class_patterns"]:
+    try:
+      highlighted_code = re.sub(
+        pattern, 
+        lambda m: m.group(0).replace(m.group(1), f"{COLOR_CLASS}{m.group(1)}{COLOR_CODEBLOCK}"), 
+        highlighted_code
+      )
+    except Exception:
+      # Skip if there's an issue with replacement
+      pass
+    
+  # Then keywords (important to do after function patterns)
+  for keyword in keywords:
+    highlighted_code = re.sub(
+      keyword, 
+      lambda m: f"{COLOR_KEYWORD}{m.group(0)}{COLOR_CODEBLOCK}", 
+      highlighted_code
+    )
+  
+  # Finally builtins
+  for builtin in builtins:
+    highlighted_code = re.sub(
+      builtin, 
+      lambda m: f"{COLOR_BUILTIN}{m.group(0)}{COLOR_CODEBLOCK}", 
+      highlighted_code
+    )
+    
+  return highlighted_code
 
 # --------------------------------------------------------------------
 def get_terminal_width() -> int:
@@ -90,14 +285,31 @@ def get_terminal_width() -> int:
   return 80
 
 # --------------------------------------------------------------------
-def colorize_line(line: str) -> str:
+def colorize_line(line: str, options: Dict = None) -> str:
   """
   Apply inline transformations:
     - Bold (**) -> ANSI_BOLD
     - Italic (*) -> ANSI_ITALIC
     - Strikethrough (~~)
     - Inline code (`code`)
+    - Links: [text](url)
+    - Images: ![alt](url)
+    - Footnote references: [^id]
+  
+  Args:
+    line: The text line to process
+    options: Dictionary of feature flags to enable/disable features
   """
+  # Default options if none provided
+  if options is None:
+    options = {
+      "footnotes": True,
+      "syntax_highlighting": True,
+      "tables": True,
+      "task_lists": True,
+      "images": True,
+      "links": True
+    }
   # We need to be careful with the order of replacements to avoid conflicts
   
   # Inline code: `code` (do this first to avoid conflicts with other formatting)
@@ -107,14 +319,62 @@ def colorize_line(line: str) -> str:
 
   line = re.sub(r"`([^`]+)`", replace_code, line)
   
+  # Image links: ![alt](url) - must be processed before regular links
+  def replace_image(match):
+    alt_text = match.group(1)
+    url = match.group(2)
+    # Create a placeholder for the image with alt text
+    return f"{ANSI_BOLD}[IMG: {alt_text}]{ANSI_RESET}{COLOR_TEXT}"
+
+  if options.get("images", True):
+    line = re.sub(r"!\[([^\]]+)\]\(([^)]+)\)", replace_image, line)
+  
+  # Links: [text](url) - must be processed before bold and italic to avoid conflicts
+  def replace_link(match):
+    text = match.group(1)
+    url = match.group(2)
+    # Process any nested formatting within the link text (for better nested formatting)
+    if "**" in text:
+      text = re.sub(r"\*\*(.+?)\*\*", f"{ANSI_BOLD}\\1{ANSI_RESET}{COLOR_LINK}", text)
+    if "*" in text and not text.startswith("*") and not text.endswith("*"):
+      text = re.sub(r"(?<!\*)\*([^\*]+)\*(?!\*)", f"{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_LINK}", text)
+    if "~~" in text:
+      text = re.sub(r"~~(.+?)~~", f"{ANSI_STRIKE}\\1{ANSI_RESET}{COLOR_LINK}", text)
+    if "`" in text:
+      text = re.sub(r"`([^`]+)`", f"{COLOR_CODEBLOCK}`\\1`{ANSI_RESET}{COLOR_LINK}", text)
+    return f"{COLOR_LINK}{ANSI_UNDERLINE}{text}{ANSI_RESET}{COLOR_TEXT}"
+
+  if options.get("links", True):
+    line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, line)
+  
+  # Better handling of nested formatting
+  
+  # Combinations of bold+italic: ***text*** or **_text_** or _**text**_
+  if "***" in line or "**_" in line or "_**" in line:
+    line = re.sub(r"\*\*\*(.+?)\*\*\*", f"{ANSI_BOLD}{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+    line = re.sub(r"\*\*_(.+?)_\*\*", f"{ANSI_BOLD}{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+    line = re.sub(r"_\*\*(.+?)\*\*_", f"{ANSI_BOLD}{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  
   # Bold: **text**
-  line = re.sub(r"\*\*(.+?)\*\*", f"{ANSI_BOLD}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  if "**" in line:
+    line = re.sub(r"\*\*(.+?)\*\*", f"{ANSI_BOLD}\\1{ANSI_RESET}{COLOR_TEXT}", line)
   
   # Italics: *text* (but not if it's part of a list item)
-  line = re.sub(r"(?<!\*)\*([^\*]+)\*(?!\*)", f"{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  if "*" in line and not line.startswith("*") and not line.endswith("*"):
+    line = re.sub(r"(?<!\*)\*([^\*]+)\*(?!\*)", f"{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_TEXT}", line)
   
   # Strikethrough: ~~text~~
-  line = re.sub(r"~~(.+?)~~", f"{ANSI_STRIKE}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  if "~~" in line:
+    line = re.sub(r"~~(.+?)~~", f"{ANSI_STRIKE}\\1{ANSI_RESET}{COLOR_TEXT}", line)
+  
+  # Footnote references: [^1], [^note], etc.
+  def replace_footnote_ref(match):
+    ref = match.group(1)
+    # Superscript style for the footnote reference
+    return f"{COLOR_TEXT}[{ANSI_BOLD}{ANSI_DIM}^{ref}{ANSI_RESET}{COLOR_TEXT}]"
+  
+  if options.get("footnotes", True) and "[^" in line:
+    line = re.sub(r"\[\^([^\]]+)\]", replace_footnote_ref, line)
 
   return line
 
@@ -207,14 +467,15 @@ def build_table_ansi(table_lines: List[str], term_width: int = 80) -> List[str]:
 
   # Determine max column widths
   num_cols = max(len(r) for r in data_rows) if data_rows else 0
+  
+  # Ensure alignment has an entry for each column, defaulting to 'left'
+  # This handles the case where data rows have more columns than the alignment row
+  alignment = alignment + ['left'] * (num_cols - len(alignment))
+  
   col_widths = [0] * num_cols
   for r in data_rows:
     for i, cell in enumerate(r[:num_cols]):
       col_widths[i] = max(col_widths[i], len(cell))
-
-  # Fallback alignment if needed
-  while len(alignment) < num_cols:
-    alignment.append('left')
 
   # Build horizontal divider
   horizontal = "+"
@@ -233,7 +494,9 @@ def build_table_ansi(table_lines: List[str], term_width: int = 80) -> List[str]:
     
     for col_i, cell in enumerate(row_padded):
       cell_text = cell
-      # Apply inline formatting to cell content
+      
+      # Apply enhanced inline formatting to cell content
+      # This ensures proper handling of complex formatting like bold+italic and links
       cell_text = colorize_line(cell_text)
       
       # Get visible length (without ANSI codes)
@@ -252,8 +515,10 @@ def build_table_ansi(table_lines: List[str], term_width: int = 80) -> List[str]:
         # left
         padding = w - len(visible_text)
         cell_text = cell_text + " " * padding
-        
-      line_builder += f" {cell_text} |"
+      
+      # Ensure we reset formatting at the end of each cell to maintain table structure
+      # Add a wrapper that resets to table color at the end
+      line_builder += f" {cell_text}{COLOR_TABLE} |"
 
     rendered_lines.append(f"{COLOR_TABLE}{line_builder}{ANSI_RESET}")
     if row_i == 0 and has_alignment_row:  # after header, insert horizontal again
@@ -264,14 +529,32 @@ def build_table_ansi(table_lines: List[str], term_width: int = 80) -> List[str]:
   return rendered_lines
 
 # --------------------------------------------------------------------
-def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
+def md2ansi(lines: List[str], term_width: int = 80, options: Dict = None) -> List[str]:
   """
   Convert Markdown lines to ANSI-colored lines, yielding lines to print.
   We detect blocks (tables, code blocks) and process them accordingly.
+  
+  Args:
+    lines: List of markdown text lines
+    term_width: Terminal width to wrap text
+    options: Dictionary of feature flags to enable/disable features
   """
+  # Default options if none provided
+  if options is None:
+    options = {
+      "footnotes": True,
+      "syntax_highlighting": True,
+      "tables": True,
+      "task_lists": True,
+      "images": True,
+      "links": True
+    }
+    
   result = []
   in_code_block = False
   code_fence = None
+  footnotes = {}  # Format: {id: text}
+  footnote_refs = []  # List of footnote ids in order of appearance
   i = 0
   
   while i < len(lines):
@@ -282,18 +565,21 @@ def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
     code_fence_match = re.match(r"^(```|~~~)(.*)$", line)
     if code_fence_match:
       fence = code_fence_match.group(1)
-      lang = code_fence_match.group(2).strip()
+      lang_spec = code_fence_match.group(2).strip()
       
       if in_code_block:
         # closing fence
         in_code_block = False
-        result.append(f"{COLOR_CODEBLOCK}{code_fence}{ANSI_RESET}")
+        code_fence = None  # Reset code fence
+        lang = None  # Reset language when exiting block
+        result.append(f"{COLOR_CODEBLOCK}{fence}{ANSI_RESET}")
         i += 1
         continue
       else:
         # opening fence
         in_code_block = True
         code_fence = fence
+        lang = lang_spec if lang_spec else None  # Store language for the block
         fence_line = f"{COLOR_CODEBLOCK}{fence}"
         if lang:
           fence_line += f" {lang}"
@@ -302,17 +588,70 @@ def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
         continue
 
     if in_code_block:
-      result.append(f"{COLOR_CODEBLOCK}{line}{ANSI_RESET}")
+      # Store code lines for syntax highlighting
+      if lang and options.get("syntax_highlighting", True):
+        # First sanitize all ANSI sequences
+        clean_line = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', line)
+        
+        # Special handling based on language
+        if lang.lower() in ["bash", "sh", "shell"]:
+          # Handle bash comments specially
+          if clean_line.strip().startswith("#"):
+            # Replace any patterns that look like ANSI codes in comments
+            clean_line = re.sub(r'\[([0-9]{1,2}(;[0-9]{1,2})*m)', r'[\1]', clean_line)
+            clean_line = re.sub(r'\[38;5;[0-9]+m', r'[color]', clean_line)
+            result.append(f"{COLOR_COMMENT}{clean_line}{ANSI_RESET}")
+          else:
+            # Basic highlighting for bash command lines
+            for builtin in SYNTAX_RULES["bash"]["builtins"]:
+              pattern = r'\b' + re.escape(builtin) + r'\b'
+              clean_line = re.sub(pattern, f"{COLOR_BUILTIN}\\g<0>{COLOR_CODEBLOCK}", clean_line)
+            result.append(f"{COLOR_CODEBLOCK}{clean_line}{ANSI_RESET}")
+        
+        elif lang.lower() in ["python", "py"]:
+          # Handle Python comments
+          if clean_line.strip().startswith("#"):
+            clean_line = re.sub(r'\[([0-9]{1,2}(;[0-9]{1,2})*m)', r'[\1]', clean_line)
+            result.append(f"{COLOR_COMMENT}{clean_line}{ANSI_RESET}")
+          # Handle Python docstrings
+          elif '"""' in clean_line or "'''" in clean_line:
+            clean_line = re.sub(r'\[([0-9]{1,2}(;[0-9]{1,2})*m)', r'[\1]', clean_line)
+            result.append(f"{COLOR_STRING}{clean_line}{ANSI_RESET}")
+          else:
+            # Basic highlighting for other Python lines
+            for keyword in SYNTAX_RULES["python"]["keywords"]:
+              pattern = r'\b' + re.escape(keyword) + r'\b'
+              clean_line = re.sub(pattern, f"{COLOR_KEYWORD}\\g<0>{COLOR_CODEBLOCK}", clean_line)
+            for builtin in SYNTAX_RULES["python"]["builtins"]:
+              pattern = r'\b' + re.escape(builtin) + r'\b'
+              clean_line = re.sub(pattern, f"{COLOR_BUILTIN}\\g<0>{COLOR_CODEBLOCK}", clean_line)
+            result.append(f"{COLOR_CODEBLOCK}{clean_line}{ANSI_RESET}")
+            
+        else:
+          # For all other languages, just use basic code coloring
+          result.append(f"{COLOR_CODEBLOCK}{clean_line}{ANSI_RESET}")
+      else:
+        # No language specified or syntax highlighting disabled, use default color
+        clean_line = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', line)
+        result.append(f"{COLOR_CODEBLOCK}{clean_line}{ANSI_RESET}")
       i += 1
       continue
 
     # Detect if this is the start of a table
-    if re.match(r"^\s*\|", line):
+    if re.match(r"^\s*\|", line) and options.get("tables", True):
       table_block, next_i = parse_table(lines, i)
       # Build the table
       table_ansi = build_table_ansi(table_block, term_width=term_width)
       result.extend(table_ansi)
       i = next_i
+      continue
+    elif re.match(r"^\s*\|", line):
+      # Tables are disabled but we found what looks like a table
+      # Just format as plain text with basic formatting
+      line_colored = f"{COLOR_TEXT}{colorize_line(line, options)}"
+      segments = wrap_text(line_colored, term_width)
+      result.extend(segments)
+      i += 1
       continue
 
     # Horizontal rules: --- / === / ___
@@ -324,7 +663,7 @@ def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
     # Blockquotes: lines starting with >
     if re.match(r"^\s*>", line):
       content = re.sub(r"^\s*> ?", "", line)
-      content = colorize_line(content)
+      content = colorize_line(content, options)
       content_wrapped = wrap_text(content, term_width - 4)
       for wrapped_segment in content_wrapped:
         result.append(f"{COLOR_TEXT}  > {COLOR_BLOCKQUOTE}{wrapped_segment}{ANSI_RESET}")
@@ -351,17 +690,62 @@ def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
         color = COLOR_H6
       
       # Apply inline formatting to heading text
-      text = colorize_line(text)
+      text = colorize_line(text, options)
       result.append(f"{color}{text}{ANSI_RESET}")
       i += 1
       continue
 
+    # Task lists: lines starting with '-' or '*' followed by [ ] or [x]
+    task_match = re.match(r"^(\s*)[\-\*]\s+\[([ x])\]\s+(.*)", line)
+    if task_match:
+      indent = task_match.group(1)
+      task_status = task_match.group(2)
+      item_content = task_match.group(3)
+      
+      if options.get("task_lists", True):
+        # Process as a task list with checkbox
+        item_content = colorize_line(item_content, options)
+        
+        # Calculate indentation level for nested lists
+        indent_level = len(indent) // 2
+        bullet_indent = "  " * indent_level
+        text_indent = "  " * (indent_level + 1) + "     "  # 5 extra spaces for "[ ] "
+        
+        # Format checkbox based on status
+        if task_status == "x":
+          checkbox = f"{COLOR_LIST}[{ANSI_BOLD}x{ANSI_RESET}{COLOR_LIST}]"
+        else:
+          checkbox = f"{COLOR_LIST}[ ]"
+        
+        segments = wrap_text(item_content, term_width - len(text_indent) - 2)
+        result.append(f"{bullet_indent}{COLOR_LIST}* {checkbox} {COLOR_TEXT}{segments[0]}")
+        for seg in segments[1:]:
+          result.append(f"{text_indent}{seg}")
+      else:
+        # Process as a regular list item when task lists are disabled
+        # Combine the checkbox and text as part of the list item
+        combined_content = f"[{task_status}] {item_content}"
+        combined_content = colorize_line(combined_content, options)
+        
+        # Calculate indentation level for nested lists
+        indent_level = len(indent) // 2
+        bullet_indent = "  " * indent_level
+        text_indent = "  " * (indent_level + 1)
+        
+        segments = wrap_text(combined_content, term_width - len(text_indent) - 2)
+        result.append(f"{bullet_indent}{COLOR_LIST}* {COLOR_TEXT}{segments[0]}")
+        for seg in segments[1:]:
+          result.append(f"{text_indent}{seg}")
+      
+      i += 1
+      continue
+      
     # Unordered lists: lines starting with '-' or '*'
     list_match = re.match(r"^(\s*)[\-\*]\s+(.*)", line)
     if list_match:
       indent = list_match.group(1)
       item_content = list_match.group(2)
-      item_content = colorize_line(item_content)
+      item_content = colorize_line(item_content, options)
       
       # Calculate indentation level for nested lists
       indent_level = len(indent) // 2
@@ -374,36 +758,119 @@ def md2ansi(lines: List[str], term_width: int = 80) -> List[str]:
         result.append(f"{text_indent}{seg}")
       i += 1
       continue
+      
+    # Ordered lists: lines starting with a number followed by a period
+    ordered_list_match = re.match(r"^(\s*)(\d+)\.[ \t]+(.*)", line)
+    if ordered_list_match:
+      indent = ordered_list_match.group(1)
+      number = ordered_list_match.group(2)
+      item_content = ordered_list_match.group(3)
+      item_content = colorize_line(item_content, options)
+      
+      # Calculate indentation level for nested lists
+      indent_level = len(indent) // 2
+      number_indent = "  " * indent_level
+      # Add 2 extra spaces for each digit in the number (e.g., "10. " vs "1. ")
+      number_width = len(number) + 2  # includes the period and space
+      text_indent = "  " * indent_level + " " * number_width
+      
+      segments = wrap_text(item_content, term_width - len(text_indent) - 2)
+      result.append(f"{number_indent}{COLOR_LIST}{number}. {COLOR_TEXT}{segments[0]}")
+      for seg in segments[1:]:
+        result.append(f"{text_indent}{seg}")
+      i += 1
+      continue
 
+    # Check for footnote definition: [^1]: Footnote text
+    footnote_def_match = re.match(r"^\[\^([^\]]+)\]:\s+(.+)$", line)
+    if footnote_def_match and options.get("footnotes", True):
+      footnote_id = footnote_def_match.group(1)
+      footnote_text = footnote_def_match.group(2)
+      
+      # Store footnote text for later rendering
+      footnotes[footnote_id] = footnote_text
+      
+      # Add reference if it doesn't exist yet (for definitions without references)
+      if footnote_id not in footnote_refs:
+        footnote_refs.append(footnote_id)
+      
+      # Skip this line in the main output
+      i += 1
+      continue
+        
     # Otherwise, normal text. Apply inline expansions and wrap.
     if line.strip():  # Skip empty lines
-      line_colored = f"{COLOR_TEXT}{colorize_line(line)}"
+      # Find footnote references in the line and track them
+      refs = re.findall(r"\[\^([^\]]+)\]", line)
+      for ref in refs:
+        if ref not in footnote_refs:
+          footnote_refs.append(ref)
+          
+      line_colored = f"{COLOR_TEXT}{colorize_line(line, options)}"
       segments = wrap_text(line_colored, term_width)
       result.extend(segments)
     else:
       result.append("")  # Preserve empty lines
 
     i += 1
+    
+  # Add footnotes section at the end if footnotes exist
+  if footnotes and footnote_refs and options.get("footnotes", True):
+    result.append("")  # Add a blank line before footnotes
+    result.append(f"{COLOR_H2}Footnotes:{ANSI_RESET}")
+    result.append("")
+    
+    # Render footnotes in order of appearance
+    for idx, ref_id in enumerate(footnote_refs):
+      if ref_id in footnotes:
+        # Format the footnote text with inline formatting
+        footnote_text = colorize_line(footnotes[ref_id], options)
+        result.append(f"{COLOR_TEXT}[{ANSI_BOLD}{ANSI_DIM}^{ref_id}{ANSI_RESET}{COLOR_TEXT}]: {footnote_text}")
+      else:
+        # Reference exists but definition doesn't
+        result.append(f"{COLOR_TEXT}[{ANSI_BOLD}{ANSI_DIM}^{ref_id}{ANSI_RESET}{COLOR_TEXT}]: Missing footnote definition")
 
   return result
 
 # --------------------------------------------------------------------
-def process_file(filename: Optional[str] = None, term_width: int = 80) -> List[str]:
-  """Process a single file or stdin and return formatted lines."""
+def process_file(filename: Optional[str] = None, term_width: int = 80, options: Dict = None) -> List[str]:
+  """
+  Process a single file or stdin and return formatted lines.
+  
+  Args:
+    filename: Path to markdown file or None for stdin
+    term_width: Terminal width for wrapping
+    options: Dictionary of feature flags to enable/disable features
+  """
   try:
     if filename:
-      with open(filename, "r", encoding="utf-8") as f:
-        content = f.read()
+      try:
+        with open(filename, "r", encoding="utf-8") as f:
+          content = f.read()
+      except FileNotFoundError:
+        return [f"ERROR: File '{filename}' not found."]
+      except IsADirectoryError:
+        return [f"ERROR: '{filename}' is a directory, not a file."]
+      except PermissionError:
+        return [f"ERROR: Permission denied when trying to read '{filename}'."]
+      except UnicodeDecodeError:
+        return [f"ERROR: '{filename}' is not a valid UTF-8 text file."]
     else:
-      content = sys.stdin.read()
+      try:
+        content = sys.stdin.read()
+      except KeyboardInterrupt:
+        print(f"{ANSI_RESET}")
+        sys.exit(130)  # Standard exit code for SIGINT
+      except Exception as e:
+        return [f"ERROR: Failed to read from stdin: {str(e)}"]
       
     all_lines = content.splitlines()
-    return md2ansi(all_lines, term_width=term_width)
+    return md2ansi(all_lines, term_width=term_width, options=options)
     
-  except FileNotFoundError:
-    return [f"ERROR: '{filename}' not found."]
+  except MemoryError:
+    return [f"ERROR: Not enough memory to process {'file' if filename else 'input'}."]
   except Exception as e:
-    return [f"ERROR: {str(e)}"]
+    return [f"ERROR: Unexpected error: {type(e).__name__}: {str(e)}"]
 
 # --------------------------------------------------------------------
 def main():
@@ -419,20 +886,62 @@ def main():
     help="Force specific terminal width (default: auto-detect)"
   )
   parser.add_argument(
-    "-V", "--version", action="version", version="0.9.0",
+    "-V", "--version", action="version", version="0.9.5",
     help="Show version information and exit"
   )
+  
+  # Feature toggle options
+  feature_group = parser.add_argument_group('Feature toggles')
+  feature_group.add_argument(
+    "--no-footnotes", action="store_true",
+    help="Disable footnotes processing"
+  )
+  feature_group.add_argument(
+    "--no-syntax-highlight", action="store_true",
+    help="Disable syntax highlighting in code blocks"
+  )
+  feature_group.add_argument(
+    "--no-tables", action="store_true",
+    help="Disable tables formatting"
+  )
+  feature_group.add_argument(
+    "--no-task-lists", action="store_true",
+    help="Disable task lists (checkboxes) formatting"
+  )
+  feature_group.add_argument(
+    "--no-images", action="store_true",
+    help="Disable image placeholders"
+  )
+  feature_group.add_argument(
+    "--no-links", action="store_true",
+    help="Disable links formatting"
+  )
+  feature_group.add_argument(
+    "--plain", action="store_true",
+    help="Use plain text mode (disables all formatting features)"
+  )
+  
   args = parser.parse_args()
 
   # Use specified width or auto-detect
   term_width = args.width if args.width else get_terminal_width()
+  
+  # Build options dictionary based on command-line arguments
+  options = {
+    "footnotes": not (args.no_footnotes or args.plain),
+    "syntax_highlighting": not (args.no_syntax_highlight or args.plain),
+    "tables": not (args.no_tables or args.plain),
+    "task_lists": not (args.no_task_lists or args.plain),
+    "images": not (args.no_images or args.plain),
+    "links": not (args.no_links or args.plain)
+  }
 
   # Print initial color reset to ensure terminal is in a clean state
   print(ANSI_RESET, end="")
   
   if args.files:
     for fname in args.files:
-      formatted_lines = process_file(fname, term_width)
+      formatted_lines = process_file(fname, term_width, options)
       for line in formatted_lines:
         print(line)
       # Add a newline between files if processing multiple files
@@ -440,7 +949,7 @@ def main():
         print()
   else:
     # Read from stdin
-    formatted_lines = process_file(None, term_width)
+    formatted_lines = process_file(None, term_width, options)
     for line in formatted_lines:
       print(line)
       
