@@ -1,0 +1,38 @@
+#!/bin/bash
+set -euo pipefail
+# Extract links from markdown files
+
+if (($#==0)); then
+  >&2 echo "Usage: $(basename "$0") <markdown_file>"
+  exit 1
+fi
+
+if [[ ! -f "$1" ]]; then
+  >&2 echo "Error: File '$1' not found."
+  exit 1
+fi
+
+# Function to remove UTM parameters from URLs
+remove_utm() {
+  sed -E 's/\?utm_[^=]+=([^&]*)$//' |
+  sed -E 's/(\?|&)utm_[^=]+=([^&]*)(&|$)/\1/g' |
+  sed -E 's/(\?|&)$//'
+}
+
+# Extract all types of links and process them
+{
+  # Extract inline links [text](url)
+  grep -o -E '\[.*?\]\(.*?\)' "$1" | sed -E 's/\[(.*?)\]\((.*?)\)/\2/'
+
+  # Extract bare URLs <http://example.com>
+  grep -o -E '<https?://[^>]+>' "$1" | sed -E 's/<(https?:\/\/[^>]+)>/\1/'
+
+  # Extract reference-style links
+  refs=$(grep -o -E '\[.*?\]\[.*?\]' "$1" | sed -E 's/\[(.*?)\]\[(.*?)\]/\2/')
+  for ref in $refs; do
+    url=$(grep -E "^\[$ref\]:" "$1" | sed -E 's/\[.*?\]:\s*(.*)/\1/')
+    [[ -n "$url" ]] && echo "$url"
+  done
+} | remove_utm | sort | uniq
+
+#fin
