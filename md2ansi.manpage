@@ -1,0 +1,207 @@
+.\" Man page for md2ansi
+.\" Generated from README.md by md2ansi-create-manpage.sh
+.TH MD2ANSI 1 "July 2025" "md2ansi 0.9.5" "User Commands"
+.SH NAME
+md2ansi \- Convert Markdown to ANSI-colored text in the terminal
+.SH SYNOPSIS
+.B md2ansi
+[\fIFILE\fR...]
+[\fIOPTIONS\fR]
+.br
+.B md
+[\fIFILE\fR]
+.br
+\fIcommand\fR |
+.B md2ansi
+.SH DESCRIPTION
+.B md2ansi
+is a Python-based Markdown to ANSI terminal formatter that renders markdown files
+with color and style directly in your terminal. It supports headers, lists, tables,
+code blocks with syntax highlighting, and more.
+.PP
+The tool requires no external Python dependencies and works with any terminal
+that supports 256-color ANSI sequences.
+
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show help message and exit
+.TP
+.BR \-V ", " \-\-version
+Show version information and exit
+.TP
+.BR \-D ", " \-\-debug
+Enable debug mode (reserved for future use)
+.TP
+.BI \-\-width " WIDTH"
+Force specific terminal width (default: auto-detect)
+.TP
+.B \-\-no\-footnotes
+Disable footnotes processing
+.TP
+.B \-\-no\-syntax\-highlight
+Disable syntax highlighting in code blocks
+.TP
+.B \-\-no\-tables
+Disable tables formatting
+.TP
+.B \-\-no\-task\-lists
+Disable task lists (checkboxes) formatting
+.TP
+.B \-\-no\-images
+Disable image placeholders
+.TP
+.B \-\-no\-links
+Disable links formatting
+.TP
+.B \-\-plain
+Use plain text mode (disables all formatting features)
+
+.SH EXAMPLES
+View a single markdown file:
+.PP
+.RS 4
+md2ansi README.md
+.RE
+.PP
+View with pager for long files:
+.PP
+.RS 4
+md README.md
+.RE
+.PP
+Process multiple files:
+.PP
+.RS 4
+md2ansi *.md
+.RE
+.PP
+Process from stdin:
+.PP
+.RS 4
+cat README.md | md2ansi
+.br
+curl -s https://example.com/README.md | md2ansi
+.RE
+.PP
+Force specific terminal width:
+.PP
+.RS 4
+md2ansi --width 100 README.md
+.RE
+.PP
+Disable specific features:
+.PP
+.RS 4
+md2ansi --no-syntax-highlight --no-tables README.md
+.RE
+.PP
+Plain text mode:
+.PP
+.RS 4
+md2ansi --plain README.md
+.RE
+
+.SH FEATURES
+.SS Headers
+H1-H6 headers with distinct color gradients from yellow to purple
+.SS Lists
+.IP \(bu 2
+Unordered lists with proper nesting and indentation
+.IP \(bu 2
+Ordered lists with automatic numbering
+.IP \(bu 2
+Task lists with checkboxes ([ ] and [x])
+.SS Code Blocks
+.IP \(bu 2
+Fenced with \fB```\fR or \fB~~~\fR with language detection
+.IP \(bu 2
+Syntax highlighting for Python, JavaScript, and Bash
+.IP \(bu 2
+Support for language aliases (py, js, sh, shell)
+.IP \(bu 2
+ANSI escape sequence sanitization
+.SS Tables
+.IP \(bu 2
+Pipe-delimited with alignment support
+.IP \(bu 2
+Enhanced formatting with mixed styling in cells
+.IP \(bu 2
+Handles mismatched column counts gracefully
+.SS Inline Formatting
+.IP \(bu 2
+\fBBold\fR text rendering
+.IP \(bu 2
+\fIItalic\fR text rendering
+.IP \(bu 2
+Strikethrough text rendering
+.IP \(bu 2
+Inline code with distinct styling
+.IP \(bu 2
+Links with underlined styling
+.IP \(bu 2
+Image alt text placeholders
+.IP \(bu 2
+Footnote references with automatic collection
+
+.SH SECURITY
+md2ansi includes several security features:
+.IP \(bu 2
+Files larger than 10MB are rejected for safety
+.IP \(bu 2
+ANSI escape sequences in input are sanitized
+.IP \(bu 2
+Safe handling of special characters in filenames
+.IP \(bu 2
+Command injection prevention in utility scripts
+.IP \(bu 2
+Graceful signal handling with terminal reset
+
+.SH FILES
+.TP
+.I /usr/local/share/md2ansi/
+Installation directory containing all md2ansi scripts
+.TP
+.I /usr/local/bin/md2ansi
+Symbolic link to the main converter script
+.TP
+.I /usr/local/bin/md
+Symbolic link to the pager wrapper script
+.TP
+.I /etc/bash_completion.d/md2ansi
+Bash completion configuration (if installed)
+.SH ENVIRONMENT
+.TP
+.B COLUMNS
+If set, used as fallback for terminal width detection
+.TP
+.B LESS
+Used by the \fBmd\fR wrapper script (set to '-FXRS')
+
+.SH EXIT STATUS
+.TP
+.B 0
+Successful execution
+.TP
+.B 1
+General error (file not found, invalid options, etc.)
+.TP
+.B 130
+Interrupted by user (Ctrl+C)
+.SH SEE ALSO
+.BR less (1),
+.BR python3 (1),
+.BR markdown (1)
+.PP
+Project homepage: https://github.com/Open-Technology-Foundation/md2ansi
+.SH AUTHORS
+Indonesian Open Technology Foundation (https://yatti.id)
+.SH COPYRIGHT
+Copyright © 2022-2025 Indonesian Open Technology Foundation
+.PP
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+.SH BUGS
+Report bugs at: https://github.com/Open-Technology-Foundation/md2ansi/issues

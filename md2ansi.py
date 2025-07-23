@@ -1,16 +1,31 @@
 #!/usr/bin/env python3
 """
-md2ansi: Convert Markdown to ANSI-colored text in the terminal with basic
-         support for headings, lists, blockquotes, fenced code blocks, inline
-         formatting, horizontal rules, and simple pipe-delimited tables.
+md2ansi: Convert Markdown to ANSI-colored text in the terminal
+
+A zero-dependency Markdown to ANSI formatter that renders markdown files with
+color and style directly in your terminal. Supports headers, lists, tables,
+code blocks with syntax highlighting, and more.
 
 Usage:
   md2ansi [file1.md [file2.md ...]] [options]
   cat README.md | md2ansi
+  curl -s https://example.com/README.md | md2ansi
 
 Examples:
-  md2ansi file1.md file2.md
-  cat README.md | md2ansi
+  md2ansi README.md                    # View a single file
+  md2ansi *.md                         # View multiple files
+  cat doc.md | md2ansi                 # Process from stdin
+  md2ansi --width 100 README.md        # Force specific width
+  md2ansi --no-tables doc.md           # Disable table formatting
+  md2ansi --plain README.md            # Plain text mode
+
+Security:
+  - Files larger than 10MB are rejected for safety
+  - Input from stdin is also limited to 10MB
+  - ANSI escape sequences in input are sanitized
+
+Version: 0.9.5
+License: GPL-3.0
 """
 
 import sys
@@ -845,6 +860,14 @@ def process_file(filename: Optional[str] = None, term_width: int = 80, options: 
   try:
     if filename:
       try:
+        # Check file size before reading
+        import os
+        file_size = os.path.getsize(filename)
+        # Limit to 10MB for safety
+        max_size = 10 * 1024 * 1024  # 10MB in bytes
+        if file_size > max_size:
+          return [f"ERROR: File '{filename}' is too large ({file_size:,} bytes). Maximum allowed size is {max_size:,} bytes (10MB)."]
+        
         with open(filename, "r", encoding="utf-8") as f:
           content = f.read()
       except FileNotFoundError:
@@ -857,7 +880,20 @@ def process_file(filename: Optional[str] = None, term_width: int = 80, options: 
         return [f"ERROR: '{filename}' is not a valid UTF-8 text file."]
     else:
       try:
-        content = sys.stdin.read()
+        # Read from stdin with size limit
+        max_size = 10 * 1024 * 1024  # 10MB in bytes
+        content = ""
+        bytes_read = 0
+        
+        while True:
+          chunk = sys.stdin.read(8192)  # Read in 8KB chunks
+          if not chunk:
+            break
+          bytes_read += len(chunk.encode('utf-8'))
+          if bytes_read > max_size:
+            return [f"ERROR: Input from stdin is too large (>{max_size:,} bytes). Maximum allowed size is {max_size:,} bytes (10MB)."]
+          content += chunk
+          
       except KeyboardInterrupt:
         print(f"{ANSI_RESET}")
         sys.exit(130)  # Standard exit code for SIGINT
@@ -875,7 +911,11 @@ def process_file(filename: Optional[str] = None, term_width: int = 80, options: 
 # --------------------------------------------------------------------
 def main():
   parser = argparse.ArgumentParser(
-    description="Convert Markdown to ANSI-colored text in the terminal."
+    description="Convert Markdown to ANSI-colored text in the terminal.",
+    epilog="Security: Files and stdin input are limited to 10MB. "
+           "ANSI sequences in input are sanitized. "
+           "Visit https://github.com/Open-Technology-Foundation/md2ansi for more info.",
+    formatter_class=argparse.RawDescriptionHelpFormatter
   )
   parser.add_argument(
     "files", nargs="*", default=[],
@@ -888,6 +928,10 @@ def main():
   parser.add_argument(
     "-V", "--version", action="version", version="0.9.5",
     help="Show version information and exit"
+  )
+  parser.add_argument(
+    "-D", "--debug", action="store_true",
+    help="Enable debug mode (currently unused, reserved for future debugging features)"
   )
   
   # Feature toggle options

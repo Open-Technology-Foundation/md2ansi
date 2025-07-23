@@ -22,15 +22,15 @@ remove_utm() {
 # Extract all types of links and process them
 {
   # Extract inline links [text](url)
-  grep -o -E '\[.*?\]\(.*?\)' "$1" | sed -E 's/\[(.*?)\]\((.*?)\)/\2/'
+  grep -o -E '\[.*?\]\(.*?\)' -- "$1" | sed -E 's/\[(.*?)\]\((.*?)\)/\2/'
 
   # Extract bare URLs <http://example.com>
-  grep -o -E '<https?://[^>]+>' "$1" | sed -E 's/<(https?:\/\/[^>]+)>/\1/'
+  grep -o -E '<https?://[^>]+>' -- "$1" | sed -E 's/<(https?:\/\/[^>]+)>/\1/'
 
   # Extract reference-style links
-  refs=$(grep -o -E '\[.*?\]\[.*?\]' "$1" | sed -E 's/\[(.*?)\]\[(.*?)\]/\2/')
+  refs=$(grep -o -E '\[.*?\]\[.*?\]' -- "$1" | sed -E 's/\[(.*?)\]\[(.*?)\]/\2/')
   for ref in $refs; do
-    url=$(grep -E "^\[$ref\]:" "$1" | sed -E 's/\[.*?\]:\s*(.*)/\1/')
+    url=$(grep -E "^\[$ref\]:" -- "$1" | sed -E 's/\[.*?\]:\s*(.*)/\1/')
     [[ -n "$url" ]] && echo "$url"
   done
 } | remove_utm | sort | uniq
