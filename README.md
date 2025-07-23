@@ -70,6 +70,7 @@ The installation script will:
 - Set executable permissions on all scripts
 - Create symbolic links in `/usr/local/bin` for `md2ansi` and `md` commands
 - Install bash completion support (if available)
+- Generate and install man page (if prerequisites are met)
 
 ### Method 2: Manual Installation
 
@@ -362,6 +363,7 @@ Tested on:
 | `display_ansi_palette` | Shows all 256 ANSI colors |
 | `md-link-extract` | Extracts links from markdown files |
 | `md2ansi-install.sh` | System-wide installation script |
+| `md2ansi-create-manpage.sh` | Generates man page from README.md |
 
 ## Bash Completion
 
