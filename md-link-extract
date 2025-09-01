@@ -1,14 +1,14 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env bash
 # Extract links from markdown files
+set -euo pipefail
 
-if (($#==0)); then
+if (($#==0)) || [[ $1 == '-h' || $1 == '--help' ]]; then
   >&2 echo "Usage: $(basename "$0") <markdown_file>"
   exit 1
 fi
 
 if [[ ! -f "$1" ]]; then
-  >&2 echo "Error: File '$1' not found."
+  >&2 echo "$(basename "$0"): error: File '$1' not found."
   exit 1
 fi
 
@@ -20,8 +20,7 @@ remove_utm() {
 }
 
 # Extract all types of links and process them
-{
-  # Extract inline links [text](url)
+{ # Extract inline links [text](url)
   grep -o -E '\[.*?\]\(.*?\)' -- "$1" | sed -E 's/\[(.*?)\]\((.*?)\)/\2/'
 
   # Extract bare URLs <http://example.com>

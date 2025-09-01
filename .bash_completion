@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Bash completion for md2ansi and md commands
+# 
+# This completion file provides tab completion for:
+# - md2ansi: Main markdown to ANSI converter
+# - md: Wrapper script that pipes through less
+#
+# Installation:
+#   source .bash_completion
+# or
+#   cp .bash_completion /etc/bash_completion.d/md2ansi
+
+_md2ansi_completion() {
+  local cur prev opts
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  # Command line options for md2ansi
+  opts="--help -h --version -V --debug -D --width -w --no-footnotes --no-syntax-highlight --no-tables --no-task-lists --no-images --no-links --plain -t"
+
+  # Handle width parameter
+  if [[ ${prev} == "--width" || ${prev} == "-w" ]]; then
+    # Suggest common terminal widths
+    COMPREPLY=( $(compgen -W "80 100 120 140 160" -- ${cur}) )
+    return 0
+  fi
+
+  # If current word starts with -, complete with options
+  if [[ ${cur} == -* ]]; then
+    COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+    return 0
+  fi
+
+  # Complete with .md files only
+  local IFS=$'\n'
+  COMPREPLY=( $(compgen -f -X "!*.md" -- ${cur}) )
+  
+  # Also complete directories for navigation
+  if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
+    COMPREPLY=( $(compgen -d -- ${cur}) )
+  fi
+}
+
+_md_completion() {
+  local cur prev
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  # md script only accepts files and passes through md2ansi options
+  # Complete with .md files only
+  local IFS=$'\n'
+  COMPREPLY=( $(compgen -f -X "!*.md" -- ${cur}) )
+  
+  # Also complete directories for navigation
+  if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
+    COMPREPLY=( $(compgen -d -- ${cur}) )
+  fi
+}
+
+# Register completion functions
+complete -F _md2ansi_completion md2ansi
+complete -F _md_completion md
+
+#fin

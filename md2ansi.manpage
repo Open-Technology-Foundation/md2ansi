@@ -1,6 +1,6 @@
 .\" Man page for md2ansi
 .\" Generated from README.md by md2ansi-create-manpage.sh
-.TH MD2ANSI 1 "July 2025" "md2ansi 0.9.5" "User Commands"
+.TH MD2ANSI 1 "September 2025" "md2ansi 0.9.5" "User Commands"
 .SH NAME
 md2ansi \- Convert Markdown to ANSI-colored text in the terminal
 .SH SYNOPSIS

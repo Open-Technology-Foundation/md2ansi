@@ -24,7 +24,7 @@ Security:
   - Input from stdin is also limited to 10MB
   - ANSI escape sequences in input are sanitized
 
-Version: 0.9.5
+Version: 0.9.6
 License: GPL-3.0
 """
 
@@ -33,7 +33,132 @@ import re
 import shutil
 import argparse
 import signal
-from typing import List, Tuple, Optional, Dict
+import threading
+import time
+from datetime import datetime
+from typing import List, Tuple, Optional, Dict, Callable, Any
+
+# Global debug mode flag
+DEBUG_MODE = False
+
+# Maximum sizes for regex operations to prevent ReDoS
+MAX_REGEX_INPUT_SIZE = 100000  # 100KB limit for regex input
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB for files
+
+# --------------------------------------------------------------------
+# Debug functionality
+def debug_print(message: str, level: str = "INFO") -> None:
+  """Print debug messages when debug mode is active."""
+  if DEBUG_MODE:
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    print(f"[{timestamp}] [{level}] {message}", file=sys.stderr)
+
+# --------------------------------------------------------------------
+# Safe regex execution with timeout protection
+class RegexTimeout(Exception):
+  """Exception raised when regex operation times out."""
+  pass
+
+def safe_regex_sub(
+  pattern: str,
+  replacement: Any,
+  text: str,
+  flags: int = 0,
+  timeout: float = 1.0,
+  max_size: int = MAX_REGEX_INPUT_SIZE
+) -> str:
+  """
+  Safely execute regex substitution with timeout and size limits.
+  
+  Args:
+    pattern: Regex pattern to match
+    replacement: Replacement string or function
+    text: Text to search in
+    flags: Regex flags
+    timeout: Maximum time in seconds for regex operation
+    max_size: Maximum allowed input size
+    
+  Returns:
+    Modified text after substitution
+    
+  Raises:
+    ValueError: If input is too large
+    RegexTimeout: If operation takes too long
+  """
+  # Check input size to prevent excessive memory usage
+  if len(text) > max_size:
+    debug_print(f"Input too large for regex: {len(text)} > {max_size}", "WARNING")
+    raise ValueError(f"Input too large for regex operation: {len(text)} bytes exceeds {max_size} bytes limit")
+  
+  debug_print(f"Safe regex sub: pattern length={len(pattern)}, text length={len(text)}", "DEBUG")
+  
+  # For simple patterns, execute directly
+  if len(pattern) < 50 and not any(c in pattern for c in ['*', '+', '{', '?']):
+    try:
+      return re.sub(pattern, replacement, text, flags=flags)
+    except Exception as e:
+      debug_print(f"Regex failed: {e}", "ERROR")
+      raise
+  
+  # For complex patterns, use timeout protection
+  result = [None]
+  exception = [None]
+  
+  def run_regex():
+    try:
+      result[0] = re.sub(pattern, replacement, text, flags=flags)
+    except Exception as e:
+      exception[0] = e
+  
+  thread = threading.Thread(target=run_regex)
+  thread.daemon = True
+  thread.start()
+  thread.join(timeout)
+  
+  if thread.is_alive():
+    debug_print(f"Regex timeout after {timeout}s for pattern: {pattern[:50]}...", "WARNING")
+    # Thread is still running, it exceeded timeout
+    raise RegexTimeout(f"Regex operation timed out after {timeout} seconds")
+  
+  if exception[0]:
+    raise exception[0]
+  
+  return result[0]
+
+def safe_regex_match(
+  pattern: str,
+  text: str,
+  flags: int = 0,
+  timeout: float = 1.0
+) -> Optional[re.Match]:
+  """Safely execute regex match with timeout protection."""
+  if len(text) > MAX_REGEX_INPUT_SIZE:
+    debug_print(f"Input too large for regex match: {len(text)}", "WARNING")
+    return None
+  
+  result = [None]
+  exception = [None]
+  
+  def run_match():
+    try:
+      result[0] = re.match(pattern, text, flags=flags)
+    except Exception as e:
+      exception[0] = e
+  
+  thread = threading.Thread(target=run_match)
+  thread.daemon = True
+  thread.start()
+  thread.join(timeout)
+  
+  if thread.is_alive():
+    debug_print(f"Regex match timeout for pattern: {pattern[:50]}...", "WARNING")
+    return None
+  
+  if exception[0]:
+    debug_print(f"Regex match error: {exception[0]}", "ERROR")
+    return None
+  
+  return result[0]
 
 # --------------------------------------------------------------------
 # ANSI escape sequences
@@ -148,15 +273,25 @@ def sanitize_code(code: str) -> str:
   """
   Remove or escape ANSI patterns and other problematic sequences.
   """
+  debug_print(f"Sanitizing code, length: {len(code)}", "DEBUG")
+  
   # Remove any existing ANSI escape sequences
-  code = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', code)
+  try:
+    code = safe_regex_sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', code)
+  except (RegexTimeout, ValueError) as e:
+    debug_print(f"Failed to sanitize ANSI sequences: {e}", "WARNING")
+    # Fallback to simple replacement
+    code = code.replace('\x1b[', 'ESC[')
   
   # Fix common problematic ANSI-like patterns in code
   code = code.replace("\\x1b", "ESC_SEQ")
   
   # Special handling for patterns that look like ANSI color codes
-  code = re.sub(r'\[([0-9]{1,2}(;[0-9]{1,2})*m)', r'[ANSI_CODE\1', code)
-  code = re.sub(r'\[38;5;[0-9]+m', r'[COLOR_CODE]', code)
+  try:
+    code = safe_regex_sub(r'\[([0-9]{1,2}(;[0-9]{1,2})*m)', r'[ANSI_CODE\1', code)
+    code = safe_regex_sub(r'\[38;5;[0-9]+m', r'[COLOR_CODE]', code)
+  except (RegexTimeout, ValueError) as e:
+    debug_print(f"Failed to sanitize color codes: {e}", "WARNING")
   
   return code
 
@@ -266,13 +401,17 @@ def get_terminal_width() -> int:
   Get terminal width using multiple methods with fallbacks.
   Returns a reasonable default (80) if all methods fail.
   """
+  debug_print("Getting terminal width", "DEBUG")
+  
   try:
     # Method 1: Using shutil (but only if we're connected to a real terminal)
     import os
     if os.isatty(1):  # 1 is stdout
       size = shutil.get_terminal_size()
       if size.columns > 0:
-        return size.columns
+        debug_print(f"Terminal width from shutil: {size.columns}", "DEBUG")
+        # Validate reasonable bounds
+        return min(max(size.columns, 20), 500)
 
     # Method 2: Using stty
     import subprocess
@@ -282,21 +421,24 @@ def get_terminal_width() -> int:
     if result.returncode == 0:
       rows, columns = map(int, result.stdout.decode().split())
       if columns > 0:
-        return columns
+        debug_print(f"Terminal width from stty: {columns}", "DEBUG")
+        return min(max(columns, 20), 500)
 
     # Method 3: Environment variable
     if 'COLUMNS' in os.environ:
       try:
         columns = int(os.environ['COLUMNS'])
         if columns > 0:
-          return columns
+          debug_print(f"Terminal width from COLUMNS env: {columns}", "DEBUG")
+          return min(max(columns, 20), 500)
       except ValueError:
         pass
 
-  except Exception:
-    pass
+  except Exception as e:
+    debug_print(f"Error getting terminal width: {e}", "WARNING")
 
   # Fallback to standard 80 columns
+  debug_print("Using default terminal width: 80", "DEBUG")
   return 80
 
 # --------------------------------------------------------------------
@@ -332,7 +474,10 @@ def colorize_line(line: str, options: Dict = None) -> str:
     inside = match.group(1)
     return f"{COLOR_CODEBLOCK}`{inside}`{ANSI_RESET}{COLOR_TEXT}"
 
-  line = re.sub(r"`([^`]+)`", replace_code, line)
+  try:
+    line = safe_regex_sub(r"`([^`]+)`", replace_code, line)
+  except (RegexTimeout, ValueError):
+    debug_print("Failed to process inline code", "WARNING")
   
   # Image links: ![alt](url) - must be processed before regular links
   def replace_image(match):
@@ -342,7 +487,10 @@ def colorize_line(line: str, options: Dict = None) -> str:
     return f"{ANSI_BOLD}[IMG: {alt_text}]{ANSI_RESET}{COLOR_TEXT}"
 
   if options.get("images", True):
-    line = re.sub(r"!\[([^\]]+)\]\(([^)]+)\)", replace_image, line)
+    try:
+      line = safe_regex_sub(r"!\[([^\]]+)\]\(([^)]+)\)", replace_image, line)
+    except (RegexTimeout, ValueError):
+      debug_print("Failed to process image links", "WARNING")
   
   # Links: [text](url) - must be processed before bold and italic to avoid conflicts
   def replace_link(match):
@@ -350,17 +498,20 @@ def colorize_line(line: str, options: Dict = None) -> str:
     url = match.group(2)
     # Process any nested formatting within the link text (for better nested formatting)
     if "**" in text:
-      text = re.sub(r"\*\*(.+?)\*\*", f"{ANSI_BOLD}\\1{ANSI_RESET}{COLOR_LINK}", text)
+      text = safe_regex_sub(r"\*\*(.+?)\*\*", f"{ANSI_BOLD}\\1{ANSI_RESET}{COLOR_LINK}", text)
     if "*" in text and not text.startswith("*") and not text.endswith("*"):
-      text = re.sub(r"(?<!\*)\*([^\*]+)\*(?!\*)", f"{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_LINK}", text)
+      text = safe_regex_sub(r"(?<!\*)\*([^\*]+)\*(?!\*)", f"{ANSI_ITALIC}\\1{ANSI_RESET}{COLOR_LINK}", text)
     if "~~" in text:
-      text = re.sub(r"~~(.+?)~~", f"{ANSI_STRIKE}\\1{ANSI_RESET}{COLOR_LINK}", text)
+      text = safe_regex_sub(r"~~(.+?)~~", f"{ANSI_STRIKE}\\1{ANSI_RESET}{COLOR_LINK}", text)
     if "`" in text:
-      text = re.sub(r"`([^`]+)`", f"{COLOR_CODEBLOCK}`\\1`{ANSI_RESET}{COLOR_LINK}", text)
+      text = safe_regex_sub(r"`([^`]+)`", f"{COLOR_CODEBLOCK}`\\1`{ANSI_RESET}{COLOR_LINK}", text)
     return f"{COLOR_LINK}{ANSI_UNDERLINE}{text}{ANSI_RESET}{COLOR_TEXT}"
 
   if options.get("links", True):
-    line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, line)
+    try:
+      line = safe_regex_sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, line)
+    except (RegexTimeout, ValueError):
+      debug_print("Failed to process links", "WARNING")
   
   # Better handling of nested formatting
   
@@ -922,16 +1073,16 @@ def main():
     help="Markdown files to process; reads from stdin if none are provided."
   )
   parser.add_argument(
-    "--width", type=int,
+    "-w", "--width", type=int,
     help="Force specific terminal width (default: auto-detect)"
   )
   parser.add_argument(
-    "-V", "--version", action="version", version="0.9.5",
+    "-V", "--version", action="version", version="0.9.6",
     help="Show version information and exit"
   )
   parser.add_argument(
     "-D", "--debug", action="store_true",
-    help="Enable debug mode (currently unused, reserved for future debugging features)"
+    help="Enable debug mode with detailed execution traces (output to stderr)"
   )
   
   # Feature toggle options
@@ -961,11 +1112,19 @@ def main():
     help="Disable links formatting"
   )
   feature_group.add_argument(
-    "--plain", action="store_true",
+    "-t", "--plain", action="store_true",
     help="Use plain text mode (disables all formatting features)"
   )
   
   args = parser.parse_args()
+
+  # Enable debug mode if requested
+  global DEBUG_MODE
+  DEBUG_MODE = args.debug
+  
+  if DEBUG_MODE:
+    debug_print("Debug mode enabled", "INFO")
+    debug_print(f"Arguments: {args}", "DEBUG")
 
   # Use specified width or auto-detect
   term_width = args.width if args.width else get_terminal_width()
@@ -979,6 +1138,10 @@ def main():
     "images": not (args.no_images or args.plain),
     "links": not (args.no_links or args.plain)
   }
+  
+  if DEBUG_MODE:
+    debug_print(f"Terminal width: {term_width}", "INFO")
+    debug_print(f"Options: {options}", "DEBUG")
 
   # Print initial color reset to ensure terminal is in a clean state
   print(ANSI_RESET, end="")

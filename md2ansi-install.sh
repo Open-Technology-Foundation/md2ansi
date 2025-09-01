@@ -97,16 +97,16 @@ fi
 
 cd "$sharedir"
 echo "Setting executable permissions..."
-sudo chmod +x md2ansi.py md2ansi md display_ansi_palette md-link-extract md2ansi-create-manpage.sh 2>/dev/null || true
+sudo chmod +x md2ansi.py md2ansi md display-ansi-palette md-link-extract md2ansi-create-manpage.sh 2>/dev/null || true
 
 echo "Creating symbolic links..."
 sudo ln -sf "$sharedir"/md2ansi /usr/local/bin/md2ansi
 sudo ln -sf "$sharedir"/md /usr/local/bin/md
 
 # Install bash completion if directory exists
-if [[ -d /etc/bash_completion.d/ ]] && [[ -f "$sharedir/bash-completion/md2ansi" ]]; then
+if [[ -d /etc/bash_completion.d/ ]] && [[ -f "$sharedir/.bash_completion" ]]; then
   echo "Installing bash completion..."
-  sudo cp "$sharedir/bash-completion/md2ansi" /etc/bash_completion.d/
+  sudo cp "$sharedir/.bash_completion" /etc/bash_completion.d/md2ansi
 fi
 
 # Generate and install man page

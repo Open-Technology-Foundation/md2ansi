@@ -1,11 +1,12 @@
 # MD2ANSI
 
-A Python-based Markdown to ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
+A Python-based Markdown-to-ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
 
-![Version](https://img.shields.io/badge/version-0.9.5-blue.svg)
+![Version](https://img.shields.io/badge/version-0.9.6-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-44%20passing-green.svg)
 
 ## Features
 
@@ -42,9 +43,14 @@ A Python-based Markdown to ANSI terminal formatter that renders markdown files w
   - File size validation (10MB limit for security)
   - Graceful signal handling (Ctrl+C)
 - **Security:**
+  - ReDoS (Regular Expression Denial of Service) protection with timeouts
   - Input sanitization to prevent ANSI injection
   - File size limits to prevent DoS attacks
   - Safe handling of special characters in filenames
+- **Developer Tools:**
+  - Debug mode with detailed execution traces
+  - Comprehensive test suite with 44+ unit tests
+  - Test fixtures for edge cases and security testing
 
 ## Installation
 
@@ -79,14 +85,14 @@ Clone the repository and make the scripts executable:
 ```bash
 git clone https://github.com/Open-Technology-Foundation/md2ansi
 cd md2ansi
-chmod +x md2ansi.py md2ansi md display_ansi_palette md-link-extract
+chmod +x md2ansi.py md2ansi md display-ansi-palette md-link-extract
 
 # Create symbolic links (optional but recommended):
 sudo ln -s $(pwd)/md2ansi /usr/local/bin/md2ansi
 sudo ln -s $(pwd)/md /usr/local/bin/md
 
 # Install bash completion (optional):
-sudo cp bash-completion/md2ansi /etc/bash_completion.d/
+sudo cp .bash_completion /etc/bash_completion.d/md2ansi
 ```
 
 ### Method 3: Local Usage (No Installation)
@@ -127,6 +133,11 @@ curl -s https://raw.githubusercontent.com/user/repo/main/README.md | md2ansi
 ```bash
 # Force specific terminal width
 md2ansi --width 100 README.md
+md2ansi -w 80 README.md
+
+# Enable debug mode for troubleshooting
+md2ansi --debug README.md 2>debug.log
+md2ansi -D README.md  # Debug output to stderr
 
 # Disable specific features
 md2ansi --no-syntax-highlight code-heavy.md
@@ -134,6 +145,7 @@ md2ansi --no-tables --no-footnotes simple.md
 
 # Plain text mode (all formatting disabled)
 md2ansi --plain README.md
+md2ansi -t README.md
 
 # View help and version
 md2ansi --help
@@ -163,7 +175,7 @@ md2ansi docs/*.md | grep -i "installation"
 
 ```bash
 # Display ANSI color palette
-./display_ansi_palette
+./display-ansi-palette
 
 # Extract all links from a markdown file
 ./md-link-extract README.md
@@ -178,15 +190,15 @@ md2ansi docs/*.md | grep -i "installation"
 |--------|-------|-------------|
 | `--help` | `-h` | Show help message and exit |
 | `--version` | `-V` | Show version information and exit |
-| `--debug` | `-D` | Enable debug mode (reserved for future use) |
-| `--width WIDTH` | | Force specific terminal width (default: auto-detect) |
+| `--debug` | `-D` | Enable debug mode with detailed execution traces |
+| `--width WIDTH` | `-w` | Force specific terminal width (default: auto-detect) |
 | `--no-footnotes` | | Disable footnotes processing |
 | `--no-syntax-highlight` | | Disable syntax highlighting in code blocks |
 | `--no-tables` | | Disable tables formatting |
 | `--no-task-lists` | | Disable task lists (checkboxes) formatting |
 | `--no-images` | | Disable image placeholders |
 | `--no-links` | | Disable links formatting |
-| `--plain` | | Plain text mode (disables all formatting) |
+| `--plain` | `-t` | Plain text mode (disables all formatting) |
 
 ## Formatting Examples
 
@@ -308,6 +320,49 @@ Footnotes[^1] are collected and displayed at the end[^note].
 [^note]: This is a named footnote.
 ```
 
+## Testing
+
+MD2ANSI includes a comprehensive test suite to ensure reliability and prevent regressions:
+
+```bash
+# Run the test suite
+./run_tests.sh
+
+# Run with verbose output
+./run_tests.sh --verbose
+
+# Run with coverage report (requires pytest-cov)
+./run_tests.sh --coverage
+
+# Run tests directly with Python
+python3 test_md2ansi.py
+
+# Test specific functionality
+python3 -m unittest test_md2ansi.TestSafeRegex
+python3 -m unittest test_md2ansi.TestColorizeLine
+```
+
+### Test Coverage
+
+The test suite includes:
+- **Safe Regex Operations**: ReDoS protection and timeout handling
+- **Input Sanitization**: ANSI escape sequence removal
+- **Terminal Width Detection**: Bounds checking and fallback behavior
+- **Text Formatting**: Bold, italic, code, links, and combined styles
+- **Table Rendering**: Alignment, formatting, and edge cases
+- **Syntax Highlighting**: Multiple language support
+- **File Processing**: Size limits and error handling
+- **Debug Mode**: Logging and trace functionality
+
+### Test Fixtures
+
+Test fixtures are provided in the `test_fixtures/` directory:
+- `basic.md` - General markdown features
+- `tables.md` - Table formatting variations
+- `code_blocks.md` - Syntax highlighting tests
+- `edge_cases.md` - Special characters and malformed markdown
+- `redos_patterns.md` - ReDoS attack patterns for security testing
+
 ## Technical Details
 
 ### Architecture
@@ -360,7 +415,7 @@ Tested on:
 | `md2ansi` | Main converter script (Python) |
 | `md2ansi.py` | Symlink to md2ansi for compatibility |
 | `md` | Wrapper that pipes through `less -R` |
-| `display_ansi_palette` | Shows all 256 ANSI colors |
+| `display-ansi-palette` | Shows all 256 ANSI colors |
 | `md-link-extract` | Extracts links from markdown files |
 | `md2ansi-install.sh` | System-wide installation script |
 | `md2ansi-create-manpage.sh` | Generates man page from README.md |
@@ -378,7 +433,7 @@ md <Tab>          # Shows all .md files
 md2ansi --<Tab>   # Shows all available options
 
 # Install completion manually if needed
-source bash-completion/md2ansi
+source .bash_completion
 ```
 
 ## Requirements
@@ -386,18 +441,22 @@ source bash-completion/md2ansi
 - **Python**: 3.8 or higher
 - **Terminal**: ANSI color support (most modern terminals)
 - **Optional**: `less` command for the `md` wrapper script
-- **Optional**: `bash-completion` package for tab completion
+- **Optional**: `.bash_completion` package for tab completion
 - **No Python packages required** - uses only standard library
 
 ## Security Considerations
 
-MD2ANSI includes several security features:
+MD2ANSI includes comprehensive security features:
 
-1. **File size limits**: Files larger than 10MB are rejected
-2. **Input sanitization**: ANSI escape sequences in input are removed
-3. **Safe file handling**: Proper error messages for invalid files
-4. **Command injection prevention**: All grep commands use `--` separator
-5. **Signal handling**: Graceful exit on Ctrl+C with terminal reset
+1. **ReDoS Protection**: All regex operations have timeouts (1 second default) to prevent catastrophic backtracking
+2. **Input Size Limits**: 
+   - Files larger than 10MB are rejected
+   - Regex input limited to 100KB to prevent memory exhaustion
+3. **Input Sanitization**: ANSI escape sequences in input are removed to prevent injection attacks
+4. **Safe File Handling**: Proper error messages and validation for all file operations
+5. **Command Injection Prevention**: All grep commands use `--` separator
+6. **Signal Handling**: Graceful exit on Ctrl+C with terminal reset
+7. **Bounds Checking**: Terminal width validated to reasonable limits (20-500 columns)
 
 ## Contributing
 
@@ -432,6 +491,25 @@ When reporting bugs, please include:
 - The markdown file causing issues (if possible)
 - The exact command you ran
 - Any error messages
+
+## Changelog
+
+### Version 0.9.6 (2025-09-01)
+- **Security**: Added ReDoS protection with timeout-based regex execution
+- **Feature**: Implemented debug mode (`--debug`/`-D`) with detailed execution traces
+- **Testing**: Added comprehensive test suite with 44+ unit tests
+- **Testing**: Created test fixtures for edge cases and security testing
+- **Improvement**: Added terminal width bounds checking (20-500 columns)
+- **Improvement**: Enhanced error handling with fallback mechanisms
+- **Fix**: Updated all regex operations to use safe wrappers
+- **Docs**: Added testing documentation and security details
+
+### Version 0.9.5 (Previous)
+- Fixed syntax highlighting issues with ANSI escape sequences
+- Improved handling of code blocks for all supported languages
+- Fixed handling of multiline strings and comments
+- Improved error handling with specific error messages
+- Fixed table alignment with mismatched column counts
 
 ## Acknowledgments
 

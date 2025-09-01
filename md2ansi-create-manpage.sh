@@ -55,7 +55,8 @@ check_readme() {
 
 # Generate man page header
 generate_header() {
-  local date=$(date +"%B %Y")
+  local -- date
+  date=$(date +"%B %Y")
   cat << EOF
 .\" Man page for md2ansi
 .\" Generated from README.md by md2ansi-create-manpage.sh

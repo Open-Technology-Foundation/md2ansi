@@ -1,5 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 export LESS='-FXRS'
-md2ansi "$@" | less
+"$(dirname -- "$(readlink -en -- "$0")")"/md2ansi "$@" | less
 #fin

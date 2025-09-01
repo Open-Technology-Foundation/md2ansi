@@ -15,7 +15,7 @@ MD2ANSI is a zero-dependency Python tool that converts Markdown to ANSI-colored 
   - `display_ansi_palette`: Shows ANSI 256-color palette (includes `trim()` function)
   - `md-link-extract`: Extracts links from markdown files (uses `--` for grep safety)
   - `md2ansi-install.sh`: System-wide installation to `/usr/local/share/md2ansi`
-- **Bash Completion**: `bash-completion/md2ansi` provides tab completion for .md files only
+- **Bash Completion**: `.bash_completion` provides tab completion for .md files only
 
 ## Project Commands
 - Run md2ansi: `./md2ansi [file.md]` or `cat file.md | ./md2ansi`
@@ -32,7 +32,7 @@ MD2ANSI is a zero-dependency Python tool that converts Markdown to ANSI-colored 
 - Manual testing: `./md2ansi test_features.md`
 - Feature verification: `./md2ansi test_features.md | less -R`
 - Test specific feature: `./md2ansi test_features.md | grep -A10 "### Headers"`
-- Test bash completion: `source bash-completion/md2ansi && complete -p md2ansi`
+- Test bash completion: `source ./.bash_completion && complete -p md2ansi`
 
 ## Code Style Guidelines
 - Python:
