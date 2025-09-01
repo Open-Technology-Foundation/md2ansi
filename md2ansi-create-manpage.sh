@@ -60,7 +60,7 @@ generate_header() {
   cat << EOF
 .\" Man page for md2ansi
 .\" Generated from README.md by md2ansi-create-manpage.sh
-.TH MD2ANSI ${MAN_SECTION} "${date}" "md2ansi 0.9.5" "User Commands"
+.TH MD2ANSI ${MAN_SECTION} "${date}" "md2ansi 0.9.6" "User Commands"
 .SH NAME
 md2ansi \- Convert Markdown to ANSI-colored text in the terminal
 .SH SYNOPSIS
@@ -96,10 +96,13 @@ Show help message and exit
 Show version information and exit
 .TP
 .BR \-D ", " \-\-debug
-Enable debug mode (reserved for future use)
+Enable debug mode with detailed execution traces (output to stderr)
 .TP
-.BI \-\-width " WIDTH"
+.BR \-w ", " \-\-width " WIDTH"
 Force specific terminal width (default: auto-detect)
+.TP
+.BR \-t ", " \-\-plain
+Use plain text mode (disables all formatting features)
 .TP
 .B \-\-no\-footnotes
 Disable footnotes processing
@@ -118,9 +121,6 @@ Disable image placeholders
 .TP
 .B \-\-no\-links
 Disable links formatting
-.TP
-.B \-\-plain
-Use plain text mode (disables all formatting features)
 EOF
 }
 
@@ -158,6 +158,16 @@ Force specific terminal width:
 .PP
 .RS 4
 md2ansi --width 100 README.md
+.br
+md2ansi -w 80 README.md
+.RE
+.PP
+Enable debug mode for troubleshooting:
+.PP
+.RS 4
+md2ansi --debug README.md 2>debug.log
+.br
+md2ansi -D README.md
 .RE
 .PP
 Disable specific features:
@@ -225,9 +235,13 @@ EOF
 generate_security() {
   cat << 'EOF'
 .SH SECURITY
-md2ansi includes several security features:
+md2ansi includes comprehensive security features:
+.IP \(bu 2
+ReDoS protection with timeout-based regex execution (1 second default)
 .IP \(bu 2
 Files larger than 10MB are rejected for safety
+.IP \(bu 2
+Regex input limited to 100KB to prevent memory exhaustion
 .IP \(bu 2
 ANSI escape sequences in input are sanitized
 .IP \(bu 2
@@ -236,6 +250,8 @@ Safe handling of special characters in filenames
 Command injection prevention in utility scripts
 .IP \(bu 2
 Graceful signal handling with terminal reset
+.IP \(bu 2
+Terminal width bounded to reasonable limits (20-500 columns)
 EOF
 }
 
