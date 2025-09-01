@@ -1,4 +1,4 @@
-
+#!/usr/bin/env md
 # ANSI colours for Fun and Profit
 
      > ANSI escape codes can be used to modify text colour and style in a Bash terminal.
@@ -70,10 +70,10 @@
 
 ## Usage Examples
 
-- To set the text colour to red: `\\\\x1b[31m`
-- To set the background colour to blue: `\\\\x1b[44m`
-- To make text bold: `\\\\x1b[1m`
-- To reset all attributes to default: `\\\\x1b[0m`
+- To set the text colour to red: `\x1b[31m`
+- To set the background colour to blue: `\x1b[44m`
+- To make text bold: `\x1b[1m`
+- To reset all attributes to default: `\x1b[0m`
 
-You can combine multiple codes by separating them with semicolons. For example, to set the text to red and bold, you can use `\\\\x1b[31;1m`.
+You can combine multiple codes by separating them with semicolons. For example, to set the text to red and bold, you can use `\x1b[31;1m`.
 
