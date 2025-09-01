@@ -6,33 +6,61 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 MD2ANSI is a zero-dependency Python tool that converts Markdown to ANSI-colored terminal output. The codebase follows K.I.S.S. principles with all core functionality in a single Python file for easy distribution.
 
 ## Architecture
-- **md2ansi.py**: Main converter (964 lines) - handles all parsing, rendering, and CLI
-  - Key functions: `md2ansi()` (main parser), `colorize_line()` (inline formatting), `highlight_code()` (syntax highlighting), `build_table_ansi()` (table rendering)
-  - Uses regex-based parsing with careful ANSI escape sequence handling
-  - Implements streaming line-by-line processing for memory efficiency
+- **md2ansi.py**: Main converter (1170 lines) - handles all parsing, rendering, and CLI
+  - Security layer: `safe_regex_sub()`, `safe_regex_match()` - ReDoS protection with timeouts
+  - Core parser: `md2ansi()` - main markdown-to-ANSI conversion pipeline
+  - Inline formatting: `colorize_line()` - handles bold, italic, links, code
+  - Syntax highlighting: `highlight_code()` - language-aware code coloring
+  - Table rendering: `build_table_ansi()` - alignment-aware table formatter
+  - Debug system: `debug_print()` with `DEBUG_MODE` global flag
 - **Wrapper Scripts**:
   - `md`: Bash wrapper that pipes output through `less -R` for pagination
-  - `display_ansi_palette`: Shows ANSI 256-color palette (includes `trim()` function)
+  - `display-ansi-palette`: Shows ANSI 256-color palette
   - `md-link-extract`: Extracts links from markdown files (uses `--` for grep safety)
   - `md2ansi-install.sh`: System-wide installation to `/usr/local/share/md2ansi`
-- **Bash Completion**: `.bash_completion` provides tab completion for .md files only
+  - `md2ansi-create-manpage.sh`: Generates troff-format man page from README
+- **Testing Infrastructure**:
+  - `test_md2ansi.py`: 44 unit tests covering all major functions
+  - `run_tests.sh`: Test runner with pytest/unittest fallback
+  - `test_fixtures/`: Markdown test files including ReDoS patterns
+- **Configuration Files**:
+  - `.bash_completion`: Tab completion for md2ansi and md commands
+  - `md2ansi.manpage`: Generated man page in troff format
 
-## Project Commands
-- Run md2ansi: `./md2ansi [file.md]` or `cat file.md | ./md2ansi`
-- View markdown in terminal: `./md file.md` (pipes through less pager)
-- Display color palette: `./display_ansi_palette`
-- View help: `./md2ansi -h` or `./md2ansi --help`
-- Check version: `./md2ansi -V` or `./md2ansi --version`
-- Force specific width: `./md2ansi --width 100 README.md`
-- Disable features: `./md2ansi --no-footnotes --no-tables README.md`
-- Plain text mode: `./md2ansi --plain README.md`
-- Debug mode: `./md2ansi -D` or `./md2ansi --debug`
+## Development Commands
 
-## Testing Commands
-- Manual testing: `./md2ansi test_features.md`
-- Feature verification: `./md2ansi test_features.md | less -R`
-- Test specific feature: `./md2ansi test_features.md | grep -A10 "### Headers"`
-- Test bash completion: `source ./.bash_completion && complete -p md2ansi`
+### Running and Testing
+```bash
+# Run with debug output (to stderr)
+./md2ansi -D README.md 2>debug.log
+
+# Run full test suite
+./run_tests.sh
+./run_tests.sh --verbose
+./run_tests.sh --coverage  # requires pytest-cov
+
+# Run specific test class
+python3 -m unittest test_md2ansi.TestSafeRegex
+
+# Test ReDoS protection
+timeout 2 ./md2ansi test_fixtures/redos_patterns.md
+
+# Generate/update manpage
+./md2ansi-create-manpage.sh
+./md2ansi-create-manpage.sh --preview
+```
+
+### Installation
+```bash
+# Install system-wide
+sudo ./md2ansi-install.sh
+
+# Install bash completion
+source .bash_completion
+
+# Install manpage
+./md2ansi-create-manpage.sh --install
+```
 
 ## Code Style Guidelines
 - Python:
@@ -66,17 +94,25 @@ MD2ANSI is a zero-dependency Python tool that converts Markdown to ANSI-colored 
 - Handle SIGINT signals gracefully
 - File size validation before processing (10MB limit)
 
-## Recent Improvements (v0.9.5)
-- Fixed syntax highlighting issues with ANSI escape sequences
-- Improved handling of code blocks for all supported languages
-- Fixed handling of multiline strings and comments in code blocks
-- Improved error handling with specific error messages
-- Fixed table alignment with mismatched column counts
-- Removed unused imports for better performance
-- Fixed issues with undefined variables
-- Added input size validation for security
-- Fixed undefined `trim()` function in display_ansi_palette
-- Added `--` to grep commands to prevent command injection
+## Version 0.9.6 Security & Performance Architecture
+
+### ReDoS Protection System
+- All regex operations wrapped in `safe_regex_sub()` with 1-second timeout
+- Threading-based timeout mechanism prevents catastrophic backtracking
+- Input size validation: MAX_REGEX_INPUT_SIZE = 100KB, MAX_FILE_SIZE = 10MB
+- Fallback mechanisms when regex operations fail or timeout
+
+### Debug Mode Implementation
+- Global `DEBUG_MODE` flag set via `--debug`/`-D` command line
+- `debug_print()` outputs timestamped messages to stderr
+- Debug points throughout: terminal width detection, regex operations, file processing
+- Performance timing information in debug output
+
+### Testing Strategy
+- Unit tests use `unittest` framework (zero dependencies)
+- Test fixtures include edge cases and malicious patterns
+- `run_tests.sh` automatically detects pytest or falls back to unittest
+- Security tests verify ReDoS protection with actual attack patterns
 
 ## Implementation Principles
 - K.I.S.S. (Keep It Simple, Stupid)
@@ -87,11 +123,26 @@ MD2ANSI is a zero-dependency Python tool that converts Markdown to ANSI-colored 
 - Zero external dependencies (Python stdlib only)
 
 ## Critical Functions Reference
-- `sanitize_code()`: Removes ANSI sequences from code blocks before highlighting
-- `get_terminal_width()`: Multi-method terminal width detection with 80-char fallback
-- `wrap_text()`: ANSI-aware text wrapping that preserves formatting
-- `parse_table()`: Extracts consecutive table lines from markdown
-- `process_file()`: Entry point for file/stdin processing with size validation
+
+### Security Layer (Lines 58-161)
+- `safe_regex_sub(pattern, replacement, text, timeout=1.0)`: Timeout-protected regex substitution
+- `safe_regex_match(pattern, text, timeout=1.0)`: Timeout-protected regex matching
+- `RegexTimeout`: Exception raised when regex operations exceed timeout
+
+### Core Processing Pipeline (Lines 547-848)
+- `md2ansi(lines, term_width, options)`: Main parser, handles all markdown elements
+- `process_file(filename, term_width, options)`: Entry point with size validation
+- `sanitize_code(code)`: Removes ANSI sequences before syntax highlighting
+
+### Rendering Functions (Lines 399-544)
+- `colorize_line(line, options)`: Inline formatting (bold, italic, links, code)
+- `highlight_code(code, language)`: Language-aware syntax highlighting
+- `build_table_ansi(table_lines, term_width)`: Table rendering with alignment
+- `wrap_text(line, width)`: ANSI-aware text wrapping
+
+### Utility Functions (Lines 399-442)
+- `get_terminal_width()`: Multi-method detection with bounds checking (20-500)
+- `parse_table(lines, start_index)`: Extracts consecutive table lines
 
 ## Files to Ignore
 - .gudang/, .symlink, tmp/, temp/, .temp/

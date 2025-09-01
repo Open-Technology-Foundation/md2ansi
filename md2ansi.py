@@ -1052,6 +1052,12 @@ def process_file(filename: Optional[str] = None, term_width: int = 80, options: 
         return [f"ERROR: Failed to read from stdin: {str(e)}"]
       
     all_lines = content.splitlines()
+    
+    # Skip shebang line if present on the first line
+    if all_lines and all_lines[0].startswith('#!'):
+      debug_print(f"Skipping shebang line: {all_lines[0]}", "DEBUG")
+      all_lines = all_lines[1:]
+    
     return md2ansi(all_lines, term_width=term_width, options=options)
     
   except MemoryError:

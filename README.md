@@ -1,3 +1,4 @@
+#!/usr/bin/env md
 # MD2ANSI
 
 A Python-based Markdown-to-ANSI terminal formatter that renders markdown files with color and style directly in your terminal.
