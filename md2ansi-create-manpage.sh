@@ -5,7 +5,6 @@
 # The man page is created in troff format for compatibility with the man system
 #
 # Usage: ./md2ansi-create-manpage.sh [--install|--uninstall]
-
 set -euo pipefail
 
 # Configuration
@@ -497,7 +496,5 @@ main() {
   fi
 }
 
-# Run main function
 main "$@"
-
 #fin
