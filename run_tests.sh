@@ -139,7 +139,10 @@ if [[ $? -eq 0 ]]; then
     if [[ -f "$fixture" ]]; then
       filename=$(basename "$fixture")
       echo -n "Testing $filename... "
-      
+
+      # Add small delay between tests to prevent resource exhaustion
+      sleep 0.1
+
       # Test normal mode
       if ./md2ansi "$fixture" > /dev/null 2>&1; then
         echo -n "✓ "
@@ -147,7 +150,10 @@ if [[ $? -eq 0 ]]; then
         echo -e "${RED}✗ Failed${NC}"
         continue
       fi
-      
+
+      # Small delay between modes
+      sleep 0.05
+
       # Test debug mode
       if ./md2ansi --debug "$fixture" 2>/dev/null 1>/dev/null; then
         echo -n "✓ "
@@ -155,7 +161,10 @@ if [[ $? -eq 0 ]]; then
         echo -e "${RED}✗ Debug failed${NC}"
         continue
       fi
-      
+
+      # Small delay between modes
+      sleep 0.05
+
       # Test plain mode
       if ./md2ansi --plain "$fixture" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC}"

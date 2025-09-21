@@ -35,6 +35,7 @@ import argparse
 import signal
 import threading
 import time
+import multiprocessing
 from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Callable, Any
 
@@ -59,6 +60,16 @@ class RegexTimeout(Exception):
   """Exception raised when regex operation times out."""
   pass
 
+def _regex_sub_worker(pattern: str, replacement: str, text: str, flags: int, queue: multiprocessing.Queue):
+  """Worker function for regex substitution in subprocess."""
+  import re  # Import here since this runs in a separate process
+  try:
+    # Only use string replacement, not callable replacement in subprocess
+    result = re.sub(pattern, replacement, text, flags=flags)
+    queue.put(('success', result))
+  except Exception as e:
+    queue.put(('error', str(e)))
+
 def safe_regex_sub(
   pattern: str,
   replacement: Any,
@@ -69,7 +80,7 @@ def safe_regex_sub(
 ) -> str:
   """
   Safely execute regex substitution with timeout and size limits.
-  
+
   Args:
     pattern: Regex pattern to match
     replacement: Replacement string or function
@@ -77,10 +88,10 @@ def safe_regex_sub(
     flags: Regex flags
     timeout: Maximum time in seconds for regex operation
     max_size: Maximum allowed input size
-    
+
   Returns:
     Modified text after substitution
-    
+
   Raises:
     ValueError: If input is too large
     RegexTimeout: If operation takes too long
@@ -89,9 +100,9 @@ def safe_regex_sub(
   if len(text) > max_size:
     debug_print(f"Input too large for regex: {len(text)} > {max_size}", "WARNING")
     raise ValueError(f"Input too large for regex operation: {len(text)} bytes exceeds {max_size} bytes limit")
-  
+
   debug_print(f"Safe regex sub: pattern length={len(pattern)}, text length={len(text)}", "DEBUG")
-  
+
   # For simple patterns, execute directly
   if len(pattern) < 50 and not any(c in pattern for c in ['*', '+', '{', '?']):
     try:
@@ -99,31 +110,68 @@ def safe_regex_sub(
     except Exception as e:
       debug_print(f"Regex failed: {e}", "ERROR")
       raise
-  
-  # For complex patterns, use timeout protection
-  result = [None]
-  exception = [None]
-  
-  def run_regex():
+
+  # For complex patterns that might cause ReDoS, use subprocess with timeout
+  # This provides true process isolation and termination capability
+  try:
+    # If replacement is callable, we can't use subprocess easily
+    # Fall back to direct execution with risk warning
+    if callable(replacement):
+      debug_print("Warning: Callable replacement cannot use subprocess protection", "WARNING")
+      return re.sub(pattern, replacement, text, flags=flags)
+
+    # Use multiprocessing for true timeout capability
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(
+      target=_regex_sub_worker,
+      args=(pattern, replacement, text, flags, queue)
+    )
+    process.start()
+    process.join(timeout)
+
+    if process.is_alive():
+      debug_print(f"Regex timeout after {timeout}s for pattern: {pattern[:50]}...", "WARNING")
+      process.terminate()
+      process.join(0.5)  # Give it time to terminate
+      if process.is_alive():
+        process.kill()  # Force kill if needed
+        process.join()
+      raise RegexTimeout(f"Regex operation timed out after {timeout} seconds")
+
+    # Check if we got a result
+    if not queue.empty():
+      status, data = queue.get_nowait()
+      if status == 'success':
+        return data
+      else:
+        raise RuntimeError(f"Regex error: {data}")
+    else:
+      # Process ended without putting result
+      raise RuntimeError("Regex process ended without result")
+
+  except RegexTimeout:
+    raise
+  except Exception as e:
+    debug_print(f"Regex subprocess failed, falling back: {e}", "WARNING")
+    # Fall back to direct execution as last resort
     try:
-      result[0] = re.sub(pattern, replacement, text, flags=flags)
-    except Exception as e:
-      exception[0] = e
-  
-  thread = threading.Thread(target=run_regex)
-  thread.daemon = True
-  thread.start()
-  thread.join(timeout)
-  
-  if thread.is_alive():
-    debug_print(f"Regex timeout after {timeout}s for pattern: {pattern[:50]}...", "WARNING")
-    # Thread is still running, it exceeded timeout
-    raise RegexTimeout(f"Regex operation timed out after {timeout} seconds")
-  
-  if exception[0]:
-    raise exception[0]
-  
-  return result[0]
+      return re.sub(pattern, replacement, text, flags=flags)
+    except Exception as e2:
+      debug_print(f"Regex fallback also failed: {e2}", "ERROR")
+      raise
+
+def _regex_match_worker(pattern: str, text: str, flags: int, queue: multiprocessing.Queue):
+  """Worker function for regex matching in subprocess."""
+  import re  # Import here since this runs in a separate process
+  try:
+    match = re.match(pattern, text, flags=flags)
+    # Can't pickle Match objects, so extract the needed info
+    if match:
+      queue.put(('success', {'found': True, 'group': match.group(0), 'groups': match.groups()}))
+    else:
+      queue.put(('success', {'found': False}))
+  except Exception as e:
+    queue.put(('error', str(e)))
 
 def safe_regex_match(
   pattern: str,
@@ -135,30 +183,65 @@ def safe_regex_match(
   if len(text) > MAX_REGEX_INPUT_SIZE:
     debug_print(f"Input too large for regex match: {len(text)}", "WARNING")
     return None
-  
-  result = [None]
-  exception = [None]
-  
-  def run_match():
+
+  # For simple patterns, execute directly
+  if len(pattern) < 50 and not any(c in pattern for c in ['*', '+', '{', '?']):
     try:
-      result[0] = re.match(pattern, text, flags=flags)
+      return re.match(pattern, text, flags=flags)
     except Exception as e:
-      exception[0] = e
-  
-  thread = threading.Thread(target=run_match)
-  thread.daemon = True
-  thread.start()
-  thread.join(timeout)
-  
-  if thread.is_alive():
-    debug_print(f"Regex match timeout for pattern: {pattern[:50]}...", "WARNING")
-    return None
-  
-  if exception[0]:
-    debug_print(f"Regex match error: {exception[0]}", "ERROR")
-    return None
-  
-  return result[0]
+      debug_print(f"Regex match failed: {e}", "ERROR")
+      return None
+
+  # Use multiprocessing for complex patterns
+  try:
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(
+      target=_regex_match_worker,
+      args=(pattern, text, flags, queue)
+    )
+    process.start()
+    process.join(timeout)
+
+    if process.is_alive():
+      debug_print(f"Regex match timeout for pattern: {pattern[:50]}...", "WARNING")
+      process.terminate()
+      process.join(0.5)
+      if process.is_alive():
+        process.kill()
+        process.join()
+      return None
+
+    # Get result from queue
+    if not queue.empty():
+      status, data = queue.get_nowait()
+      if status == 'success':
+        if data['found']:
+          # Create a simple match-like object for compatibility
+          # Note: This won't have all Match methods but has the basic ones
+          class SimpleMatch:
+            def __init__(self, group0, groups):
+              self._group0 = group0
+              self._groups = groups
+            def group(self, n=0):
+              return self._group0 if n == 0 else (self._groups[n-1] if n <= len(self._groups) else None)
+            def groups(self):
+              return self._groups
+          return SimpleMatch(data['group'], data.get('groups', ()))
+        else:
+          return None
+      else:
+        debug_print(f"Regex match error: {data}", "ERROR")
+        return None
+    else:
+      return None
+
+  except Exception as e:
+    debug_print(f"Regex match subprocess failed, falling back: {e}", "WARNING")
+    # Fall back to direct execution
+    try:
+      return re.match(pattern, text, flags=flags)
+    except:
+      return None
 
 # --------------------------------------------------------------------
 # ANSI escape sequences
@@ -260,6 +343,22 @@ SYNTAX_RULES = {
   }
 }
 
+# Pre-compile regex patterns for syntax highlighting (performance optimization)
+COMPILED_SYNTAX_RULES = {}
+for lang, rules in SYNTAX_RULES.items():
+  COMPILED_SYNTAX_RULES[lang] = {
+    'keywords': [re.compile(r'\b' + re.escape(kw) + r'\b') for kw in rules['keywords']],
+    'builtins': [re.compile(r'\b' + re.escape(bi) + r'\b') for bi in rules['builtins']],
+    'string_patterns': [re.compile(pattern, re.MULTILINE) for pattern in rules['string_patterns']],
+    'comment_patterns': [re.compile(pattern, re.MULTILINE) for pattern in rules['comment_patterns']],
+    'number_patterns': [re.compile(pattern) for pattern in rules['number_patterns']],
+    'function_patterns': [re.compile(pattern, re.MULTILINE) for pattern in rules['function_patterns']],
+    'class_patterns': [re.compile(pattern, re.MULTILINE) for pattern in rules.get('class_patterns', [])]
+  }
+
+# Pre-compile ANSI stripping pattern for performance
+ANSI_STRIP_PATTERN = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
 # --------------------------------------------------------------------
 def sigint_handler(signum, frame):
   """Handle Ctrl-C gracefully."""
@@ -316,80 +415,72 @@ def highlight_code(code: str, language: str) -> str:
     language = lang_map[language]
   
   # If language not supported, return plain code
-  if language not in SYNTAX_RULES:
+  if language not in COMPILED_SYNTAX_RULES:
     return code
-  
+
   # Sanitize the code to prevent issues with ANSI sequences
   code = sanitize_code(code)
-  
-  rules = SYNTAX_RULES[language]
+
+  # Use pre-compiled patterns for better performance
+  compiled_rules = COMPILED_SYNTAX_RULES[language]
   highlighted_code = code
-  
-  # Create a list of all keywords with word boundaries
-  keywords = [r"\b" + kw + r"\b" for kw in rules["keywords"]]
-  builtins = [r"\b" + bi + r"\b" for bi in rules["builtins"]]
-  
+
   # Process comments first (they have highest priority)
-  for pattern in rules["comment_patterns"]:
-    highlighted_code = re.sub(
-      pattern, 
-      lambda m: f"{COLOR_COMMENT}{m.group(0)}{COLOR_CODEBLOCK}", 
+  for pattern in compiled_rules["comment_patterns"]:
+    highlighted_code = pattern.sub(
+      lambda m: f"{COLOR_COMMENT}{m.group(0)}{COLOR_CODEBLOCK}",
       highlighted_code
     )
-  
+
   # Then strings (second highest priority)
-  for pattern in rules["string_patterns"]:
-    highlighted_code = re.sub(
-      pattern, 
-      lambda m: f"{COLOR_STRING}{m.group(0)}{COLOR_CODEBLOCK}", 
+  for pattern in compiled_rules["string_patterns"]:
+    highlighted_code = pattern.sub(
+      lambda m: f"{COLOR_STRING}{m.group(0)}{COLOR_CODEBLOCK}",
       highlighted_code
     )
-  
+
   # Then numbers
-  for pattern in rules["number_patterns"]:
-    highlighted_code = re.sub(
-      pattern, 
-      lambda m: f"{COLOR_NUMBER}{m.group(0)}{COLOR_CODEBLOCK}", 
+  for pattern in compiled_rules["number_patterns"]:
+    highlighted_code = pattern.sub(
+      lambda m: f"{COLOR_NUMBER}{m.group(0)}{COLOR_CODEBLOCK}",
       highlighted_code
     )
-  
+
   # Then functions (match function definitions)
-  for pattern in rules["function_patterns"]:
+  for pattern in compiled_rules["function_patterns"]:
     try:
-      highlighted_code = re.sub(
-        pattern, 
-        lambda m: m.group(0).replace(m.group(1), f"{COLOR_FUNCTION}{m.group(1)}{COLOR_CODEBLOCK}"), 
+      highlighted_code = pattern.sub(
+        lambda m: m.group(0).replace(m.group(1), f"{COLOR_FUNCTION}{m.group(1)}{COLOR_CODEBLOCK}"),
         highlighted_code
       )
-    except Exception:
+    except (IndexError, AttributeError) as e:
       # Skip if there's an issue with replacement
+      debug_print(f"Function pattern error: {e}", "WARNING")
       pass
-  
+
   # Then classes (match class definitions)
-  for pattern in rules["class_patterns"]:
+  for pattern in compiled_rules["class_patterns"]:
     try:
-      highlighted_code = re.sub(
-        pattern, 
-        lambda m: m.group(0).replace(m.group(1), f"{COLOR_CLASS}{m.group(1)}{COLOR_CODEBLOCK}"), 
+      highlighted_code = pattern.sub(
+        lambda m: m.group(0).replace(m.group(1), f"{COLOR_CLASS}{m.group(1)}{COLOR_CODEBLOCK}"),
         highlighted_code
       )
-    except Exception:
+    except (IndexError, AttributeError) as e:
       # Skip if there's an issue with replacement
+      debug_print(f"Class pattern error: {e}", "WARNING")
       pass
-    
+
   # Then keywords (important to do after function patterns)
-  for keyword in keywords:
-    highlighted_code = re.sub(
-      keyword, 
-      lambda m: f"{COLOR_KEYWORD}{m.group(0)}{COLOR_CODEBLOCK}", 
+  for pattern in compiled_rules["keywords"]:
+    highlighted_code = pattern.sub(
+      lambda m: f"{COLOR_KEYWORD}{m.group(0)}{COLOR_CODEBLOCK}",
       highlighted_code
     )
-  
+
   # Finally builtins
-  for builtin in builtins:
-    highlighted_code = re.sub(
-      builtin, 
-      lambda m: f"{COLOR_BUILTIN}{m.group(0)}{COLOR_CODEBLOCK}", 
+  for pattern in compiled_rules["builtins"]:
+    highlighted_code = pattern.sub(
+      lambda m: f"{COLOR_BUILTIN}{m.group(0)}{COLOR_CODEBLOCK}",
       highlighted_code
     )
     
@@ -552,25 +643,28 @@ def wrap_text(line: str, width: int = 80) -> List[str]:
   # If line is empty or shorter than width, return as is
   if not line or len(line) <= width:
     return [line]
-    
+
   words = line.split()
   if not words:
     return [""]
-    
+
   lines = []
   current = words[0]
-  
-  for w in words[1:]:
-    # Calculate visible length (without ANSI codes)
-    visible_current = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', current)
-    visible_w = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', w)
-    
-    if len(visible_current) + len(visible_w) + 1 <= width:
-      current += " " + w
+
+  # Pre-calculate visible lengths once for all words (performance optimization)
+  visible_words = [(w, ANSI_STRIP_PATTERN.sub('', w)) for w in words]
+  current_visible = visible_words[0][1]
+
+  for word, visible_word in visible_words[1:]:
+    # Use cached visible lengths
+    if len(current_visible) + len(visible_word) + 1 <= width:
+      current += " " + word
+      current_visible += " " + visible_word
     else:
       lines.append(current)
-      current = w
-      
+      current = word
+      current_visible = visible_word
+
   lines.append(current)
   return lines
 
@@ -1031,25 +1125,33 @@ def process_file(filename: Optional[str] = None, term_width: int = 80, options: 
         return [f"ERROR: '{filename}' is not a valid UTF-8 text file."]
     else:
       try:
-        # Read from stdin with size limit
+        # Read from stdin with size limit (improved security & accuracy)
         max_size = 10 * 1024 * 1024  # 10MB in bytes
-        content = ""
-        bytes_read = 0
-        
+        content_bytes = b""
+
+        # Read binary data directly for accurate byte counting
         while True:
-          chunk = sys.stdin.read(8192)  # Read in 8KB chunks
+          chunk = sys.stdin.buffer.read(8192)  # Read in 8KB chunks as bytes
           if not chunk:
             break
-          bytes_read += len(chunk.encode('utf-8'))
-          if bytes_read > max_size:
+          if len(content_bytes) + len(chunk) > max_size:
             return [f"ERROR: Input from stdin is too large (>{max_size:,} bytes). Maximum allowed size is {max_size:,} bytes (10MB)."]
-          content += chunk
-          
+          content_bytes += chunk
+
+        # Decode once after all data is read, with error handling
+        try:
+          content = content_bytes.decode('utf-8', errors='replace')
+        except UnicodeDecodeError as e:
+          debug_print(f"Unicode decode error: {e}", "WARNING")
+          content = content_bytes.decode('utf-8', errors='replace')
+
       except KeyboardInterrupt:
         print(f"{ANSI_RESET}")
         sys.exit(130)  # Standard exit code for SIGINT
-      except Exception as e:
+      except (IOError, OSError) as e:
         return [f"ERROR: Failed to read from stdin: {str(e)}"]
+      except Exception as e:
+        return [f"ERROR: Unexpected error reading from stdin: {str(e)}"]
       
     all_lines = content.splitlines()
     
