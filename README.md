@@ -9,6 +9,8 @@ A Python-based Markdown-to-ANSI terminal formatter that renders markdown files w
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)
 ![Tests](https://img.shields.io/badge/tests-44%20passing-green.svg)
 
+(For pure Bash version, see [md2ansi.bash](https://github.com/Open-Technology-Foundation/md2ansi.bash))
+
 ## Features
 
 - **Headers** (H1-H6) with distinct color gradients from yellow to purple
